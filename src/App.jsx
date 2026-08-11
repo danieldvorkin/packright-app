@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plane, Briefcase, Package, Shirt, Footprints, Sparkles, Laptop, FileText, Watch,
   Plus, X, Search, GripVertical, Info, ChevronDown, ChevronLeft, Scale, AlertTriangle,
-  Trash2, PackageCheck, Save, FolderOpen, Check, Clock, ArrowRightLeft, Settings2, Home
+  Trash2, PackageCheck, Save, FolderOpen, Check, Clock, ArrowRightLeft, Settings2, Home, Cloud, Thermometer, Zap
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -117,6 +117,70 @@ function freshBagsFromPreset(key) {
   return preset.bags.map((b) => ({
     id: `bag-${nextId()}`, name: b.name, limit: b.limit, parentId: null, type: b.type,
   }));
+}
+
+async function fetchWeather(lat, lon) {
+  try {
+    const response = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7`
+    );
+    const data = await response.json();
+    return data;
+  } catch (e) {
+    console.error("Weather fetch failed:", e);
+    return null;
+  }
+}
+
+function getPackingRecommendations(weatherData) {
+  if (!weatherData) return [];
+
+  const dailyData = weatherData.daily;
+  const tempMax = Math.max(...dailyData.temperature_2m_max);
+  const tempMin = Math.min(...dailyData.temperature_2m_min);
+  const hasRain = dailyData.precipitation_sum.some((p) => p > 0.1);
+
+  const recommendations = [];
+
+  if (tempMax > 25) {
+    recommendations.push({ name: "Shorts", category: "clothing" });
+    recommendations.push({ name: "T-shirt", category: "clothing" });
+    recommendations.push({ name: "Sandals", category: "footwear" });
+    recommendations.push({ name: "Sun hat", category: "accessories" });
+    recommendations.push({ name: "Sunglasses", category: "accessories" });
+  } else if (tempMax > 15) {
+    recommendations.push({ name: "Jeans", category: "clothing" });
+    recommendations.push({ name: "T-shirt", category: "clothing" });
+    recommendations.push({ name: "Sweater", category: "clothing" });
+    recommendations.push({ name: "Sneakers", category: "footwear" });
+  } else {
+    recommendations.push({ name: "Jeans", category: "clothing" });
+    recommendations.push({ name: "Sweater", category: "clothing" });
+    recommendations.push({ name: "Dress shoes", category: "footwear" });
+  }
+
+  if (hasRain) {
+    recommendations.push({ name: "Rain jacket", category: "clothing" });
+  }
+
+  return recommendations;
+}
+
+async function geocodeDestination(destination) {
+  try {
+    const response = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=en&format=json`
+    );
+    const data = await response.json();
+    if (data.results && data.results.length > 0) {
+      const result = data.results[0];
+      return { lat: result.latitude, lon: result.longitude };
+    }
+    return null;
+  } catch (e) {
+    console.error("Geocoding failed:", e);
+    return null;
+  }
 }
 
 /* ---------------------------------------------------------
@@ -286,7 +350,7 @@ function BagCard({
 --------------------------------------------------------- */
 
 export default function PackRight() {
-  const [view, setView] = useState("index"); // index | config | organize | select-bags
+  const [view, setView] = useState("index"); // index | config | organize | select-bags | guided
 
   const [tripName, setTripName] = useState("New trip");
   const [unit, setUnit] = useState("kg");
@@ -313,6 +377,16 @@ export default function PackRight() {
   const [bagNameInput, setBagNameInput] = useState("");
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+
+  const [guidedStep, setGuidedStep] = useState("name"); // name | dates | destination | review
+  const [guideStartDate, setGuideStartDate] = useState("");
+  const [guideEndDate, setGuideEndDate] = useState("");
+  const [guideDestination, setGuideDestination] = useState("");
+  const [guideLat, setGuideLat] = useState(null);
+  const [guideLon, setGuideLon] = useState(null);
+  const [guideWeather, setGuideWeather] = useState(null);
+  const [guideRecommendations, setGuideRecommendations] = useState([]);
+  const [guideLoadingWeather, setGuideLoadingWeather] = useState(false);
 
   useEffect(() => {
     try {
@@ -423,7 +497,15 @@ export default function PackRight() {
     setBagNameInput("");
     setSaveMessage("");
     setSaveAsOpen(false);
-    setView("select-bags");
+    setGuidedStep("name");
+    setGuideStartDate("");
+    setGuideEndDate("");
+    setGuideDestination("");
+    setGuideLat(null);
+    setGuideLon(null);
+    setGuideWeather(null);
+    setGuideRecommendations([]);
+    setView("guided");
   };
 
   const persistTrips = async (list) => {
@@ -861,6 +943,180 @@ export default function PackRight() {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------
+     GUIDED PACKING EXPERIENCE
+  --------------------------------------------------------- */
+
+  if (view === "guided") {
+    const handleGuidedNext = async () => {
+      if (guidedStep === "name") {
+        if (!tripName.trim()) return;
+        setGuidedStep("dates");
+      } else if (guidedStep === "dates") {
+        if (!guideStartDate || !guideEndDate) return;
+        setGuidedStep("destination");
+      } else if (guidedStep === "destination") {
+        if (!guideDestination.trim()) return;
+        setGuidedStep("loading");
+        setGuideLoadingWeather(true);
+        const coords = await geocodeDestination(guideDestination);
+        if (coords) {
+          setGuideLat(coords.lat);
+          setGuideLon(coords.lon);
+          const weather = await fetchWeather(coords.lat, coords.lon);
+          setGuideWeather(weather);
+          if (weather) {
+            const recs = getPackingRecommendations(weather);
+            setGuideRecommendations(recs);
+          }
+        }
+        setGuideLoadingWeather(false);
+        setGuidedStep("review");
+      } else if (guidedStep === "review") {
+        setView("select-bags");
+      }
+    };
+
+    const handleGuidedBack = () => {
+      if (guidedStep === "dates") setGuidedStep("name");
+      else if (guidedStep === "destination") setGuidedStep("dates");
+      else if (guidedStep === "review") setGuidedStep("destination");
+      else setView("index");
+    };
+
+    return (
+      <div className="app">
+        <GlobalStyle />
+        <div className="wizard-wrap">
+          <button className="wizard-back" onClick={handleGuidedBack}>
+            <ChevronLeft size={15} /> {guidedStep === "name" ? "Back to trips" : "Back"}
+          </button>
+
+          {guidedStep === "name" && (
+            <>
+              <h1 className="wizard-title">Where are you going?</h1>
+              <p className="wizard-sub">Let's plan your perfect trip. Start by naming your journey.</p>
+              <input
+                className="wizard-tripname"
+                value={tripName}
+                onChange={(e) => setTripName(e.target.value)}
+                placeholder="e.g., Paris Spring Break, Beach Weekend"
+                autoFocus
+              />
+              <div style={{ marginTop: "32px" }}>
+                <button className="wizard-cta" onClick={handleGuidedNext} disabled={!tripName.trim()}>
+                  Continue <ArrowRightLeft size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {guidedStep === "dates" && (
+            <>
+              <h1 className="wizard-title">When are you traveling?</h1>
+              <p className="wizard-sub">Knowing your travel dates helps us recommend the right clothes for the weather.</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "20px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>Start date</label>
+                  <input type="date" value={guideStartDate} onChange={(e) => setGuideStartDate(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>End date</label>
+                  <input type="date" value={guideEndDate} onChange={(e) => setGuideEndDate(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px" }} />
+                </div>
+              </div>
+              <div style={{ marginTop: "28px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button className="btn-ghost" onClick={handleGuidedBack}>Back</button>
+                <button className="wizard-cta" onClick={handleGuidedNext} disabled={!guideStartDate || !guideEndDate}>
+                  Continue <ArrowRightLeft size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {guidedStep === "destination" && (
+            <>
+              <h1 className="wizard-title">Where exactly?</h1>
+              <p className="wizard-sub">Tell us your destination so we can check the weather forecast and recommend appropriate clothing.</p>
+              <input
+                type="text"
+                placeholder="City, country (e.g., Barcelona, Spain)"
+                value={guideDestination}
+                onChange={(e) => setGuideDestination(e.target.value)}
+                style={{ width: "100%", borderRadius: "6px", padding: "12px 14px", fontSize: "14px", border: "1.5px solid var(--line)", marginTop: "20px", minHeight: "40px" }}
+                autoFocus
+              />
+              <div style={{ marginTop: "28px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button className="btn-ghost" onClick={handleGuidedBack}>Back</button>
+                <button className="wizard-cta" onClick={handleGuidedNext} disabled={!guideDestination.trim()}>
+                  Check weather <Cloud size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {guidedStep === "review" && (
+            <>
+              <h1 className="wizard-title">Your Trip at a Glance</h1>
+              <p className="wizard-sub">Based on the weather forecast, here are items we recommend packing.</p>
+
+              <div style={{ background: "var(--bg-soft)", borderRadius: "8px", padding: "20px", marginTop: "24px", marginBottom: "24px" }}>
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "4px" }}>Trip</div>
+                  <div style={{ fontSize: "18px", fontWeight: "600" }}>{tripName}</div>
+                </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "4px" }}>Destination</div>
+                  <div style={{ fontSize: "16px", fontWeight: "500" }}>{guideDestination}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "4px" }}>Duration</div>
+                  <div style={{ fontSize: "14px" }}>{guideStartDate} to {guideEndDate}</div>
+                </div>
+              </div>
+
+              {guideWeather && (
+                <div style={{ marginBottom: "24px" }}>
+                  <div className="wizard-section-label">Weather forecast</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "12px" }}>
+                    {guideWeather.daily.time.slice(0, 7).map((date, i) => (
+                      <div key={date} style={{ background: "var(--white)", border: "1.5px solid var(--line)", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
+                        <div style={{ fontSize: "11px", color: "var(--ink-soft)", marginBottom: "6px" }}>{new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                        <Thermometer size={16} style={{ color: "var(--ink-soft)", margin: "6px auto" }} />
+                        <div style={{ fontSize: "14px", fontWeight: "600" }}>{Math.round(guideWeather.daily.temperature_2m_max[i])}°</div>
+                        <div style={{ fontSize: "11px", color: "var(--ink-soft)" }}>{Math.round(guideWeather.daily.temperature_2m_min[i])}°</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {guideRecommendations.length > 0 && (
+                <div style={{ marginBottom: "24px" }}>
+                  <div className="wizard-section-label">Recommended items</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {guideRecommendations.map((item) => (
+                      <span key={item.name} style={{ background: "var(--black)", color: "var(--white)", padding: "6px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "500" }}>
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: "28px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button className="btn-ghost" onClick={handleGuidedBack}>Back</button>
+                <button className="wizard-cta" onClick={handleGuidedNext}>
+                  Let's Pack <ArrowRightLeft size={15} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
