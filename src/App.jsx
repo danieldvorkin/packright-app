@@ -93,6 +93,7 @@ const AIRLINE_PRESETS = {
 let uid = 1;
 const nextId = () => `item-${uid++}`;
 const STORAGE_KEY = "packright:trips";
+const SAVED_BAGS_KEY = "packright:saved-bags";
 
 /* ---------------------------------------------------------
    HELPERS
@@ -285,7 +286,7 @@ function BagCard({
 --------------------------------------------------------- */
 
 export default function PackRight() {
-  const [view, setView] = useState("index"); // index | config | organize
+  const [view, setView] = useState("index"); // index | config | organize | select-bags
 
   const [tripName, setTripName] = useState("New trip");
   const [unit, setUnit] = useState("kg");
@@ -307,6 +308,9 @@ export default function PackRight() {
   const [saveStatus, setSaveStatus] = useState("idle");
   const [tripsError, setTripsError] = useState(null);
 
+  const [savedBags, setSavedBags] = useState([]);
+  const [bagsLoading, setBagsLoading] = useState(true);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -316,6 +320,18 @@ export default function PackRight() {
       setSavedTrips([]);
     } finally {
       setTripsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_BAGS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      setSavedBags(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setSavedBags([]);
+    } finally {
+      setBagsLoading(false);
     }
   }, []);
 
@@ -401,7 +417,7 @@ export default function PackRight() {
     setItems([]);
     setCurrentTripId(null);
     setTripsPanelOpen(false);
-    setView("config");
+    setView("select-bags");
   };
 
   const persistTrips = async (list) => {
@@ -450,6 +466,34 @@ export default function PackRight() {
   const fmtDate = (iso) => {
     try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); }
     catch { return ""; }
+  };
+
+  const persistSavedBags = async (list) => {
+    try {
+      localStorage.setItem(SAVED_BAGS_KEY, JSON.stringify(list));
+      setSavedBags(list);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const saveBagConfiguration = async (name) => {
+    if (!name.trim()) return false;
+    const record = { id: `bagset-${Date.now()}`, name: name.trim(), bags, savedAt: new Date().toISOString() };
+    const nextList = [record, ...savedBags];
+    return await persistSavedBags(nextList);
+  };
+
+  const deleteSavedBags = async (id) => {
+    const nextList = savedBags.filter((b) => b.id !== id);
+    await persistSavedBags(nextList);
+  };
+
+  const loadSavedBagConfiguration = (bagSet) => {
+    bumpUidFromIds(bagSet.bags.map((b) => b.id));
+    setBags(bagSet.bags);
+    setView("config");
   };
 
   /* ---------------------------------------------------------
@@ -742,8 +786,71 @@ export default function PackRight() {
       .wizard-cta:hover { background: var(--black-2); }
       .wizard-cta:active { transform: translateY(1px); }
       @media (min-width: 480px) { .wizard-cta { width: auto; } }
+
+      /* ---- bag select cards ---- */
+      .bags-select-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-bottom: 24px; }
+      .bag-select-card { border: 1.5px solid var(--line); background: var(--white); border-radius: 8px; padding: 14px; box-shadow: 0 2px 0 var(--line); }
+      .bag-select-card:hover { border-color: var(--ink-faint); box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+      .bag-select-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+      .bag-select-top h3 { font-size: 14px; margin: 0; font-weight: 600; text-transform: uppercase; flex: 1; min-width: 0; overflow-wrap: break-word; }
+      .bag-select-meta { font-size: 11px; color: var(--ink-soft); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
     `}</style>
   );
+
+  /* ---------------------------------------------------------
+     SELECT BAGS VIEW (choose saved or create new)
+  --------------------------------------------------------- */
+
+  if (view === "select-bags") {
+    const [bagName, setBagName] = useState("");
+    const [saveOpen, setSaveOpen] = useState(false);
+
+    return (
+      <div className="app">
+        <GlobalStyle />
+        <div className="wizard-wrap">
+          <button className="wizard-back" onClick={() => setView("index")}>
+            <ChevronLeft size={15} /> Back to trips
+          </button>
+          <h1 className="wizard-title">Your Packing Blueprints</h1>
+          <p className="wizard-sub">Start by selecting a saved bag configuration or create a new one from scratch. You can always adjust your bags before packing.</p>
+
+          <div className="wizard-section-label">Saved Configurations</div>
+          {bagsLoading && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>Loading saved bags…</div>}
+          {!bagsLoading && savedBags.length === 0 && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>No saved bag configurations yet. Create one below!</div>}
+          {!bagsLoading && savedBags.length > 0 && (
+            <div className="bags-select-grid">
+              {savedBags.map((bagSet) => (
+                <div key={bagSet.id} className="bag-select-card">
+                  <div className="bag-select-top">
+                    <h3>{bagSet.name}</h3>
+                    <button className="icon-btn" onClick={() => deleteSavedBags(bagSet.id)} title="Delete" aria-label="Delete"><X size={15} /></button>
+                  </div>
+                  <div className="bag-select-meta">
+                    <Clock size={11} /> {fmtDate(bagSet.savedAt)}
+                    <span style={{ marginLeft: "8px" }}>· {bagSet.bags.filter((b) => !b.parentId).length} bags</span>
+                  </div>
+                  <button className="btn-primary" style={{ width: "100%", marginTop: "12px" }} onClick={() => loadSavedBagConfiguration(bagSet)}>
+                    Use this setup
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="wizard-section-label" style={{ marginTop: "28px" }}>Start Fresh</div>
+          <div className="airline-grid">
+            {Object.entries(AIRLINE_PRESETS).map(([key, p]) => (
+              <button key={key} className={`airline-card ${airlineKey === key ? "active" : ""}`} onClick={() => { setAirlineKey(key); applyAirlinePreset(key); setView("config"); }}>
+                <div className="airline-card-name">{p.label}</div>
+                <div className="airline-card-sub">Checked bag: 50 lb / 23 kg</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* ---------------------------------------------------------
      INDEX VIEW
@@ -804,15 +911,49 @@ export default function PackRight() {
   --------------------------------------------------------- */
 
   if (view === "config") {
+    const [bagNameInput, setBagNameInput] = useState("");
+    const [saveAsOpen, setSaveAsOpen] = useState(false);
+    const [saveMessage, setSaveMessage] = useState("");
+
+    const handleSaveAsTemplate = async () => {
+      if (!bagNameInput.trim()) return;
+      const ok = await saveBagConfiguration(bagNameInput);
+      if (ok) {
+        setSaveMessage("✓ Bag configuration saved!");
+        setBagNameInput("");
+        setSaveAsOpen(false);
+        setTimeout(() => setSaveMessage(""), 2000);
+      }
+    };
+
     return (
       <div className="app">
         <GlobalStyle />
         <div className="wizard-wrap">
-          <button className="wizard-back" onClick={() => setView(currentTripId ? "organize" : "index")}>
-            <ChevronLeft size={15} /> {currentTripId ? "Back to packing" : "Back to trips"}
+          <button className="wizard-back" onClick={() => setView(currentTripId ? "organize" : "select-bags")}>
+            <ChevronLeft size={15} /> {currentTripId ? "Back to packing" : "Back"}
           </button>
           <h1 className="wizard-title">Set up your bags</h1>
           <p className="wizard-sub">Pick your airline to load current baggage limits, then adjust anything to fit your actual bags. You can add pouches — like a dopp kit or cables pouch — inside any bag.</p>
+
+          {saveMessage && <div style={{ background: "var(--black)", color: "var(--white)", padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", textAlign: "center" }}>{saveMessage}</div>}
+          {saveAsOpen && (
+            <div style={{ background: "var(--bg-soft)", border: "1.5px solid var(--line)", borderRadius: "8px", padding: "14px", marginBottom: "16px" }}>
+              <p style={{ fontSize: "12px", color: "var(--ink-soft)", marginBottom: "10px", marginTop: 0 }}>Save this configuration as a template for future trips</p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  placeholder="e.g., Weekend getaway, Beach trip"
+                  value={bagNameInput}
+                  onChange={(e) => setBagNameInput(e.target.value)}
+                  style={{ flex: 1, borderRadius: "5px", padding: "8px 10px", fontSize: "12.5px" }}
+                />
+                <button className="btn-primary" onClick={handleSaveAsTemplate}>Save</button>
+                <button className="btn-ghost" onClick={() => { setSaveAsOpen(false); setBagNameInput(""); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {!saveAsOpen && <button className="btn-ghost" style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => setSaveAsOpen(true)}><Save size={13} /> Save this setup as template</button>}
 
           <input className="wizard-tripname" value={tripName} onChange={(e) => setTripName(e.target.value)} placeholder="Name this trip" />
 
