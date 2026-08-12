@@ -19,6 +19,25 @@ const CATEGORIES = {
   accessories: { label: "Accessories", icon: Watch,      tip: "Fill shoes and gaps with small accessories — dead space is wasted capacity." },
 };
 
+const PRESET_CONTAINERS = [
+  {
+    name: "Dopp Kit",
+    items: ["Toothbrush + paste", "Shampoo bottle", "Deodorant", "Razor", "Moisturizer"],
+  },
+  {
+    name: "Electronics Pouch",
+    items: ["Phone charger", "USB-C cable", "Lightning cable", "Headphones", "Power bank"],
+  },
+  {
+    name: "Cable Organizer",
+    items: ["USB-C cable", "Lightning cable", "Phone charger", "Laptop charger"],
+  },
+  {
+    name: "Compression Bag",
+    items: ["Clothing"],
+  },
+];
+
 const DEFAULT_TRIP_ITEMS = [
   "Underwear",
   "Socks",
@@ -442,6 +461,7 @@ export default function PackRight() {
   const [search, setSearch] = useState("");
   const [quickAddSearch, setQuickAddSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
+  const [unpackedExpanded, setUnpackedExpanded] = useState(true);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", category: "clothing", weight: 200, qty: 1 });
@@ -777,13 +797,13 @@ export default function PackRight() {
       .trips-error { padding: 10px 14px; font-size: 12px; color: var(--ink); background: var(--bg-muted); border-left: 3px solid var(--black); }
 
       /* ---- layout ---- */
-      .layout { display: grid; grid-template-columns: 320px 1fr; gap: 0; align-items: start; position: relative; }
-      @media (max-width: 880px) {
-        .layout { grid-template-columns: 1fr; }
-        .side-panel { min-height: auto !important; border-right: none !important; border-bottom: 1px solid var(--line); }
+      .layout { display: grid; grid-template-columns: 280px 1fr; gap: 0; align-items: start; position: relative; height: calc(100vh - 88px); }
+      @media (max-width: 768px) {
+        .layout { grid-template-columns: 1fr; height: auto; }
+        .side-panel { max-height: 60vh; border-right: none !important; border-bottom: 1px solid var(--line); }
       }
-      .panel { padding: 20px; }
-      .side-panel { border-right: 1px solid var(--line); min-height: calc(100vh - 88px); background: var(--bg-soft); }
+      .panel { padding: 16px; overflow-y: auto; max-height: calc(100vh - 88px); }
+      .side-panel { border-right: 1px solid var(--line); background: var(--bg-soft); overflow-y: auto; }
 
       .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
       .search-box { flex: 1; position: relative; min-width: 0; }
@@ -847,9 +867,13 @@ export default function PackRight() {
       .preset-chip { display: inline-flex; align-items: center; gap: 5px; border: 1.5px dashed var(--line-strong); background: var(--white); border-radius: 20px; padding: 6px 10px; font-size: 11.5px; margin: 0 6px 6px 0; cursor: pointer; color: var(--ink-soft); font-weight: 500; min-height: 30px; }
       .preset-chip:hover { border-style: solid; border-color: var(--ink); color: var(--ink); background: var(--bg-muted); }
 
-      .main-panel { padding: 20px 24px; min-width: 0; }
+      .main-panel { padding: 16px; min-width: 0; overflow-y: auto; }
       .bags-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-      .bags-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+      .bags-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; }
+      @media (max-width: 768px) {
+        .bags-grid { grid-template-columns: 1fr; }
+        .main-panel { padding: 12px; }
+      }
 
       .bag-card { background: var(--white); border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 0 var(--line); min-width: 0; }
       .bag-card-top { display: flex; align-items: flex-start; gap: 10px; padding: 14px 14px 10px; border-bottom: 1px solid var(--line); }
@@ -1523,19 +1547,29 @@ export default function PackRight() {
               })}
             </div>
 
-            <div className="section-label">Unpacked ({unpacked.length})</div>
-            <div
-              className={`drop-zone ${dragOverZone === "unpacked" ? "drag-over" : ""}`}
-              onDragOver={(e) => { e.preventDefault(); setDragOverZone("unpacked"); }}
-              onDragLeave={() => setDragOverZone(null)}
-              onDrop={(e) => handleDrop(e, "unpacked")}
-            >
-              {unpacked.length === 0 && <div className="empty-hint">Nothing here — drag a packed item back, or add more below.</div>}
-              {unpacked.map((item) => (
-                <ItemTag key={item.id} item={item} unit={unit} destinations={destinations}
-                  onDragStart={handleDragStart} onMove={moveItem} onQty={qtyChange} onDelete={deleteItem} />
-              ))}
-            </div>
+            <button onClick={() => setUnpackedExpanded(!unpackedExpanded)} style={{ display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", cursor: "pointer", width: "100%", padding: "8px 0", color: "var(--ink-soft)", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              <span style={{ transform: unpackedExpanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.2s" }}>▶</span>
+              Unpacked ({unpacked.length})
+            </button>
+            {unpackedExpanded && (
+              <div
+                className={`drop-zone ${dragOverZone === "unpacked" ? "drag-over" : ""}`}
+                onDragOver={(e) => { e.preventDefault(); setDragOverZone("unpacked"); }}
+                onDragLeave={() => setDragOverZone(null)}
+                onDrop={(e) => handleDrop(e, "unpacked")}
+                style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "12px" }}
+              >
+                {unpacked.length === 0 && <div className="empty-hint">Nothing here — drag a packed item back, or add more below.</div>}
+                {unpacked.map((item) => (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px", borderBottom: "1px solid var(--line)", fontSize: "12px" }}>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} draggable onDragStart={(e) => handleDragStart(e, item.id)}>{item.name}</span>
+                    <span style={{ fontSize: "11px", color: "var(--ink-soft)" }}>{item.qty}x</span>
+                    <button className="icon-btn" onClick={() => qtyChange(item.id, -1)} style={{ padding: "4px" }}  title="Decrease">−</button>
+                    <button className="icon-btn" onClick={() => qtyChange(item.id, 1)} style={{ padding: "4px" }} title="Increase">+</button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {PRESETS.length > 0 && (
               <>
