@@ -979,6 +979,18 @@ export default function PackRight() {
         setGuideLoadingWeather(false);
         setGuidedStep("review");
       } else if (guidedStep === "review") {
+        const recommendedItems = guideRecommendations.map((rec) => {
+          const matchingPreset = PRESETS.find((p) => p.name === rec.name);
+          return {
+            id: nextId(),
+            name: rec.name,
+            category: rec.category,
+            weight: matchingPreset?.weight || 200,
+            qty: 1,
+            location: "unpacked",
+          };
+        });
+        setItems((prev) => [...prev, ...recommendedItems]);
         setView("select-bags");
       }
     };
