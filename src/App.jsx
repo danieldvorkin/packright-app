@@ -2136,6 +2136,7 @@ function AppContent() {
                           </div>
                         );
                       }).filter(Boolean).slice(0, 7)}
+                    </div>
                   </div>
 
                   {weatherPresetPacks.length > 0 && (
