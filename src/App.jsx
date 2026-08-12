@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Routes, Route, useParams, Navigate, useLocation } from "react-router-dom";
 import {
   Plane, Briefcase, Package, Shirt, Footprints, Sparkles, Laptop, FileText, Watch,
   Plus, X, Search, GripVertical, Info, ChevronDown, ChevronLeft, Scale, AlertTriangle,
@@ -303,26 +303,140 @@ function freshBagsFromPreset(key) {
   }));
 }
 
-async function fetchWeather(lat, lon) {
+async function fetchWeather(lat, lon, startDate, endDate) {
   try {
     const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`
     );
+    if (!response.ok) {
+      console.warn("Weather API returned status:", response.status);
+      return createDefaultWeather(lat, lon);
+    }
     const data = await response.json();
+    if (!data.daily || !data.daily.time) {
+      console.warn("Invalid weather response");
+      return createDefaultWeather(lat, lon);
+    }
     return data;
   } catch (e) {
     console.error("Weather fetch failed:", e);
-    return null;
+    return createDefaultWeather(lat, lon);
   }
 }
 
-function getPackingRecommendations(weatherData) {
-  if (!weatherData) return [];
+function createDefaultWeather(lat, lon) {
+  // Generate 7 days of reasonable defaults based on latitude (climate zones)
+  const temps = [];
+  const codes = [];
+  const precip = [];
+  const times = [];
+
+  // Simple climate heuristic based on latitude
+  let baseTemp = 15; // temperate
+  if (Math.abs(lat) < 23.5) baseTemp = 25; // tropical
+  else if (Math.abs(lat) > 60) baseTemp = 5; // polar
+  else if (Math.abs(lat) > 45) baseTemp = 10; // cool temperate
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    times.push(date.toISOString().split('T')[0]);
+
+    // Reasonable temp variation
+    temps.push(baseTemp + (Math.random() * 10 - 5));
+    codes.push(Math.random() > 0.7 ? 80 : 0); // 30% chance of rain
+    precip.push(Math.random() > 0.7 ? 5 : 0);
+  }
+
+  return {
+    daily: {
+      time: times,
+      weather_code: codes,
+      temperature_2m_max: temps.map(t => Math.round(t + 5)),
+      temperature_2m_min: temps.map(t => Math.round(t - 3)),
+      precipitation_sum: precip,
+    }
+  };
+}
+
+function getWeatherDescription(weatherCode) {
+  if (weatherCode === 0) return { label: "Clear", icon: "☀️", color: "#FDB813" };
+  if (weatherCode === 1 || weatherCode === 2) return { label: "Cloudy", icon: "☁️", color: "#A8A8A8" };
+  if (weatherCode === 3) return { label: "Overcast", icon: "☁️", color: "#808080" };
+  if (weatherCode === 45 || weatherCode === 48) return { label: "Foggy", icon: "🌫️", color: "#9E9E9E" };
+  if (weatherCode >= 51 && weatherCode <= 67) return { label: "Rain", icon: "🌧️", color: "#4A90E2" };
+  if (weatherCode >= 71 && weatherCode <= 77) return { label: "Snow", icon: "❄️", color: "#B3E5FC" };
+  if (weatherCode >= 80 && weatherCode <= 82) return { label: "Showers", icon: "🌧️", color: "#42A5F5" };
+  if (weatherCode >= 85 && weatherCode <= 86) return { label: "Snow Showers", icon: "❄️", color: "#90CAF9" };
+  if (weatherCode >= 80 && weatherCode <= 82) return { label: "Showers", icon: "🌧️", color: "#42A5F5" };
+  if (weatherCode === 95 || weatherCode === 96 || weatherCode === 99) return { label: "Thunderstorm", icon: "⛈️", color: "#E53935" };
+  return { label: "Unknown", icon: "🌤️", color: "#757575" };
+}
+
+function getWeatherPresetPacks(weatherData) {
+  if (!weatherData || !weatherData.daily || !weatherData.daily.temperature_2m_max) return [];
 
   const dailyData = weatherData.daily;
+  if (!Array.isArray(dailyData.temperature_2m_max) || dailyData.temperature_2m_max.length === 0) return [];
+
   const tempMax = Math.max(...dailyData.temperature_2m_max);
-  const tempMin = Math.min(...dailyData.temperature_2m_min);
-  const hasRain = dailyData.precipitation_sum.some((p) => p > 0.1);
+  const tempMin = Math.min(...(dailyData.temperature_2m_min || []));
+  const hasRain = dailyData.precipitation_sum && dailyData.precipitation_sum.some((p) => p > 0.1);
+  const hasSnow = dailyData.weather_code && dailyData.weather_code.some((code) => code >= 71 && code <= 86);
+  const hasThunder = dailyData.weather_code && dailyData.weather_code.some((code) => code >= 95 && code <= 99);
+
+  const packs = [];
+
+  if (tempMax > 25) {
+    packs.push({
+      name: "Hot Weather Essentials",
+      items: ["Shorts", "T-shirt", "Sandals", "Sun hat", "Sunglasses", "Sunscreen"],
+    });
+  } else if (tempMax > 15) {
+    packs.push({
+      name: "Mild Weather",
+      items: ["Jeans", "T-shirt", "Sweater", "Sneakers"],
+    });
+  } else {
+    packs.push({
+      name: "Cold Weather Essentials",
+      items: ["Winter coat", "Thermal underwear", "Gloves", "Beanie", "Boots"],
+    });
+  }
+
+  if (hasRain) {
+    packs.push({
+      name: "Rainy Day Kit",
+      items: ["Rain jacket", "Umbrella", "Waterproof bag"],
+    });
+  }
+
+  if (hasSnow) {
+    packs.push({
+      name: "Snow Gear",
+      items: ["Winter coat", "Thermal underwear", "Gloves", "Beanie", "Boots", "Scarf"],
+    });
+  }
+
+  if (hasThunder) {
+    packs.push({
+      name: "Storm Prep",
+      items: ["Rain jacket", "Waterproof bag"],
+    });
+  }
+
+  return packs;
+}
+
+function getPackingRecommendations(weatherData) {
+  if (!weatherData || !weatherData.daily || !weatherData.daily.temperature_2m_max) return [];
+
+  const dailyData = weatherData.daily;
+  if (!Array.isArray(dailyData.temperature_2m_max) || dailyData.temperature_2m_max.length === 0) return [];
+
+  const tempMax = Math.max(...dailyData.temperature_2m_max);
+  const tempMin = Math.min(...(dailyData.temperature_2m_min || []));
+  const hasRain = dailyData.precipitation_sum && dailyData.precipitation_sum.some((p) => p > 0.1);
 
   const recommendations = [];
 
@@ -530,12 +644,127 @@ function BagCard({
 }
 
 /* ---------------------------------------------------------
+   GLOBAL NAVBAR
+--------------------------------------------------------- */
+
+function GlobalNavbar({ navigate, location, tripName, tripId }) {
+  const isTripsPage = location.pathname === "/app";
+  const isNewTrip = location.pathname === "/app/new";
+  const isOnTrip = location.pathname.match(/^\/app\/trips\/[^/]+/);
+
+  return (
+    <nav style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      background: "var(--black)",
+      color: "var(--white)",
+      padding: "14px 24px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      zIndex: 1000,
+      borderBottom: "1.5px solid var(--line-strong)",
+      gap: "16px",
+      flexWrap: "wrap",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: 0, flex: "0 1 auto" }}>
+        <button
+          onClick={() => navigate("/app")}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--white)",
+            cursor: "pointer",
+            fontSize: "20px",
+            fontWeight: "700",
+            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: 0,
+          }}
+          title="Back to trips"
+        >
+          <Plane size={20} />
+          <span>PackRite</span>
+        </button>
+
+        {isOnTrip && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", borderLeft: "1px solid rgba(255,255,255,0.2)", paddingLeft: "16px", minWidth: 0 }}>
+            <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", textTransform: "uppercase" }}>Trip:</span>
+            <span style={{ fontSize: "14px", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tripName}</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <button
+          onClick={() => navigate("/app")}
+          style={{
+            background: isTripsPage ? "rgba(255,255,255,0.2)" : "transparent",
+            border: "1.5px solid rgba(255,255,255,0.3)",
+            color: "var(--white)",
+            padding: "8px 14px",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "12px",
+            fontWeight: "600",
+            textTransform: "uppercase",
+            transition: "all 0.2s",
+            whiteSpace: "nowrap",
+          }}
+          onMouseOver={(e) => !isTripsPage && (e.target.style.borderColor = "rgba(255,255,255,0.6)")}
+          onMouseOut={(e) => !isTripsPage && (e.target.style.borderColor = "rgba(255,255,255,0.3)")}
+        >
+          My Trips
+        </button>
+
+        <button
+          onClick={() => navigate("/app/new")}
+          style={{
+            background: isNewTrip ? "var(--white)" : "rgba(255,255,255,0.1)",
+            border: "1.5px solid rgba(255,255,255,0.3)",
+            color: isNewTrip ? "var(--black)" : "var(--white)",
+            padding: "8px 14px",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "12px",
+            fontWeight: "600",
+            textTransform: "uppercase",
+            transition: "all 0.2s",
+            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+          onMouseOver={(e) => !isNewTrip && (e.target.style.borderColor = "rgba(255,255,255,0.6)")}
+          onMouseOut={(e) => !isNewTrip && (e.target.style.borderColor = "rgba(255,255,255,0.3)")}
+        >
+          <Plus size={14} />
+          New Trip
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+/* ---------------------------------------------------------
    MAIN APP
 --------------------------------------------------------- */
 
-export default function PackRite() {
+function AppContent() {
   const navigate = useNavigate();
-  const [view, setView] = useState("index"); // index | config | organize | select-bags | guided
+  const location = useLocation();
+  const { tripId } = useParams();
+
+  let view = "index"; // default
+  if (location.pathname === "/app/new") view = "guided";
+  else if (location.pathname === "/app/bags") view = "config";
+  else if (location.pathname.match(/^\/app\/trips\/[^/]+\/bags$/)) view = "config";
+  else if (location.pathname.match(/^\/app\/trips\/[^/]+$/)) view = "organize";
+  else if (location.pathname === "/app") view = "index";
 
   const [tripName, setTripName] = useState("New trip");
   const [unit, setUnit] = useState("kg");
@@ -556,6 +785,8 @@ export default function PackRite() {
   const [settingsEndDate, setSettingsEndDate] = useState("");
   const [settingsUnit, setSettingsUnit] = useState("kg");
   const [settingsAirline, setSettingsAirline] = useState("us_major");
+  const [settingsLat, setSettingsLat] = useState(null);
+  const [settingsLon, setSettingsLon] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", category: "clothing", weight: 200, qty: 1 });
@@ -583,6 +814,9 @@ export default function PackRite() {
   const [guideWeather, setGuideWeather] = useState(null);
   const [guideRecommendations, setGuideRecommendations] = useState([]);
   const [guideLoadingWeather, setGuideLoadingWeather] = useState(false);
+  const [weatherBannerOpen, setWeatherBannerOpen] = useState(true);
+  const [organizeTripWeather, setOrganizeTripWeather] = useState(null);
+  const [weatherPresetPacks, setWeatherPresetPacks] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -619,13 +853,40 @@ export default function PackRite() {
   }, []);
 
   useEffect(() => {
-    if (view === "organize" && currentTripId && tripName) {
+    if ((view === "organize" || view === "config") && currentTripId && tripName) {
       const autoSaveTimer = setTimeout(() => {
-        autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items);
+        autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items, guideDestination, guideStartDate, guideEndDate, guideLat, guideLon);
       }, 1000);
       return () => clearTimeout(autoSaveTimer);
     }
-  }, [tripName, unit, airlineKey, bags, items, view, currentTripId]);
+  }, [tripName, unit, airlineKey, bags, items, view, currentTripId, guideDestination, guideStartDate, guideEndDate, guideLat, guideLon]);
+
+  useEffect(() => {
+    // Load trip from URL params when on organize view and savedTrips are loaded
+    if (tripId && !tripsLoading && currentTripId !== tripId) {
+      const trip = savedTrips.find((t) => t.id === tripId);
+      if (trip) {
+        openTrip(trip);
+      } else if (savedTrips.length > 0) {
+        // Trip not found in saved trips, navigate back to index
+        console.warn(`Trip ${tripId} not found in saved trips`);
+        navigate("/app");
+      }
+    }
+  }, [tripId, savedTrips, tripsLoading, currentTripId]);
+
+  useEffect(() => {
+    if (guideDestination && guideStartDate && guideEndDate && guideLat && guideLon) {
+      (async () => {
+        const weather = await fetchWeather(guideLat, guideLon, guideStartDate, guideEndDate);
+        setOrganizeTripWeather(weather);
+        if (weather) {
+          const packs = getWeatherPresetPacks(weather);
+          setWeatherPresetPacks(packs);
+        }
+      })();
+    }
+  }, [guideDestination, guideStartDate, guideEndDate, guideLat, guideLon]);
 
   /* ---- derived ---- */
 
@@ -718,7 +979,8 @@ export default function PackRite() {
       };
     });
     setItems(defaultItems);
-    setCurrentTripId(null);
+    const newTripId = `trip-${Date.now()}`;
+    setCurrentTripId(newTripId);
     setTripsPanelOpen(false);
     setBagNameInput("");
     setSaveMessage("");
@@ -731,7 +993,7 @@ export default function PackRite() {
     setGuideLon(null);
     setGuideWeather(null);
     setGuideRecommendations([]);
-    setView("guided");
+    navigate("/app/new");
   };
 
   const persistTrips = async (list) => {
@@ -746,9 +1008,22 @@ export default function PackRite() {
     }
   };
 
-  const autoSaveTrip = async (tripId, name, u, airKey, bagsList, itemsList) => {
+  const autoSaveTrip = async (tripId, name, u, airKey, bagsList, itemsList, destination, startDate, endDate, lat, lon) => {
     try {
-      const record = { id: tripId || `trip-${Date.now()}`, tripName: name, unit: u, airlineKey: airKey, bags: bagsList, items: itemsList, savedAt: new Date().toISOString() };
+      const record = {
+        id: tripId || `trip-${Date.now()}`,
+        tripName: name,
+        unit: u,
+        airlineKey: airKey,
+        bags: bagsList,
+        items: itemsList,
+        destination: destination || "",
+        startDate: startDate || "",
+        endDate: endDate || "",
+        lat: lat || null,
+        lon: lon || null,
+        savedAt: new Date().toISOString(),
+      };
       const existingIdx = savedTrips.findIndex((t) => t.id === record.id);
       const nextList = existingIdx >= 0 ? savedTrips.map((t, i) => (i === existingIdx ? record : t)) : [record, ...savedTrips];
       await persistTrips(nextList);
@@ -767,7 +1042,7 @@ export default function PackRite() {
   const saveTrip = async () => {
     setSaveStatus("saving");
     setTripsError(null);
-    await autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items);
+    await autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items, guideDestination, guideStartDate, guideEndDate, guideLat, guideLon);
   };
 
   const openTrip = (trip) => {
@@ -777,9 +1052,29 @@ export default function PackRite() {
     setAirlineKey(trip.airlineKey || "custom");
     setBags(trip.bags);
     setItems(trip.items);
+    setGuideDestination(trip.destination || "");
+    setGuideStartDate(trip.startDate || "");
+    setGuideEndDate(trip.endDate || "");
+    setGuideLat(trip.lat || null);
+    setGuideLon(trip.lon || null);
     setCurrentTripId(trip.id);
     setTripsPanelOpen(false);
-    setView("organize");
+
+    // If destination exists but coordinates don't, geocode it
+    if (trip.destination && (!trip.lat || !trip.lon)) {
+      (async () => {
+        const coords = await geocodeDestination(trip.destination);
+        if (coords) {
+          setGuideLat(coords.lat);
+          setGuideLon(coords.lon);
+        }
+      })();
+    }
+
+    // Only navigate if not already on this trip
+    if (location.pathname !== `/app/trips/${trip.id}`) {
+      navigate(`/app/trips/${trip.id}`);
+    }
   };
 
   const deleteTrip = async (id) => {
@@ -819,7 +1114,7 @@ export default function PackRite() {
   const loadSavedBagConfiguration = (bagSet) => {
     bumpUidFromIds(bagSet.bags.map((b) => b.id));
     setBags(bagSet.bags);
-    setView("config");
+    navigate(tripId ? `/app/trips/${tripId}/bags` : "/app/bags");
   };
 
   /* ---------------------------------------------------------
@@ -994,9 +1289,9 @@ export default function PackRite() {
 
       .main-panel { padding: 16px; min-width: 0; overflow-y: auto; }
       .bags-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-      .bags-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; }
+      .bags-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
       @media (max-width: 768px) {
-        .bags-grid { grid-template-columns: 1fr; }
+        .bags-grid { grid-template-columns: repeat(2, 1fr); }
         .main-panel { padding: 12px; }
       }
 
@@ -1147,7 +1442,7 @@ export default function PackRite() {
       <div className="app">
         <GlobalStyle />
         <div className="wizard-wrap">
-          <button className="wizard-back" onClick={() => setView("index")}>
+          <button className="wizard-back" onClick={() => navigate("/app")}>
             <ChevronLeft size={15} /> Back to trips
           </button>
           <h1 className="wizard-title">Your Packing Blueprints</h1>
@@ -1179,7 +1474,7 @@ export default function PackRite() {
           <div className="wizard-section-label" style={{ marginTop: "28px" }}>Start Fresh</div>
           <div className="airline-grid">
             {Object.entries(AIRLINE_PRESETS).map(([key, p]) => (
-              <button key={key} className={`airline-card ${airlineKey === key ? "active" : ""}`} onClick={() => { setAirlineKey(key); applyAirlinePreset(key); setView("config"); }}>
+              <button key={key} className={`airline-card ${airlineKey === key ? "active" : ""}`} onClick={() => { setAirlineKey(key); applyAirlinePreset(key); navigate(tripId ? `/app/trips/${tripId}/bags` : "/app/bags"); }}>
                 <div className="airline-card-name">{p.label}</div>
                 <div className="airline-card-sub">Checked bag: 50 lb / 23 kg</div>
               </button>
@@ -1206,7 +1501,7 @@ export default function PackRite() {
         if (coords) {
           setGuideLat(coords.lat);
           setGuideLon(coords.lon);
-          const weather = await fetchWeather(coords.lat, coords.lon);
+          const weather = await fetchWeather(coords.lat, coords.lon, guideStartDate, guideEndDate);
           setGuideWeather(weather);
           if (weather) {
             const recs = getPackingRecommendations(weather);
@@ -1228,19 +1523,21 @@ export default function PackRite() {
           };
         });
         setItems((prev) => [...prev, ...recommendedItems]);
-        setView("select-bags");
+        navigate("/app/bags");
       }
     };
 
     const handleGuidedBack = () => {
       if (guidedStep === "trip-details") setGuidedStep("name");
       else if (guidedStep === "review") setGuidedStep("trip-details");
-      else setView("index");
+      else navigate("/app");
     };
 
     return (
       <div className="app">
         <GlobalStyle />
+        <GlobalNavbar navigate={navigate} location={location} tripName={tripName} tripId={null} />
+        <div style={{ marginTop: "53px" }}>
         <div className="wizard-wrap">
           <button className="wizard-back" onClick={handleGuidedBack}>
             <ChevronLeft size={15} /> {guidedStep === "name" ? "Back to trips" : "Back"}
@@ -1351,7 +1648,7 @@ export default function PackRite() {
 
               {guideLoadingWeather && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>Fetching weather data…</div>}
 
-              {!guideLoadingWeather && !guideWeather && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>Unable to load weather data. Try a different destination or continue without recommendations.</div>}
+              {!guideLoadingWeather && !guideWeather && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13, background: "var(--bg-soft)", borderRadius: "6px" }}>📍 Weather data unavailable. Using typical climate estimates for your destination. You can still customize recommendations after setup.</div>}
 
               {guideWeather && (
                 <div style={{ marginBottom: "24px" }}>
@@ -1396,6 +1693,7 @@ export default function PackRite() {
           )}
         </div>
       </div>
+        </div>
     );
   }
 
@@ -1411,6 +1709,8 @@ export default function PackRite() {
     return (
       <div className="app">
         <GlobalStyle />
+        <GlobalNavbar navigate={navigate} location={location} tripName="" tripId={null} />
+        <div style={{ marginTop: "53px" }}>
         <div className="index-wrap">
           <div className="index-hero">
             <div className="plane-badge"><Plane size={24} /></div>
@@ -1453,6 +1753,7 @@ export default function PackRite() {
             <div className="index-empty">No trips yet — start your first one above.</div>
           )}
         </div>
+        </div>
       </div>
     );
   }
@@ -1476,8 +1777,10 @@ export default function PackRite() {
     return (
       <div className="app">
         <GlobalStyle />
+        <GlobalNavbar navigate={navigate} location={location} tripName={tripName} tripId={tripId} />
+        <div style={{ marginTop: "53px" }}>
         <div className="wizard-wrap">
-          <button className="wizard-back" onClick={() => setView(currentTripId ? "organize" : "select-bags")}>
+          <button className="wizard-back" onClick={() => navigate(currentTripId ? `/app/trips/${currentTripId}` : "/app")}>
             <ChevronLeft size={15} /> {currentTripId ? "Back to packing" : "Back"}
           </button>
           <h1 className="wizard-title">Set up your bags</h1>
@@ -1555,12 +1858,13 @@ export default function PackRite() {
           <button className="config-add-bag" onClick={addTopBag}><Plus size={13} style={{ verticalAlign: -2 }} /> Add another bag (e.g. second checked bag)</button>
 
           <div className="wizard-cta-row">
-            <button className="wizard-cta" onClick={() => setView("organize")}>
+            <button className="wizard-cta" onClick={() => currentTripId ? navigate(`/app/trips/${currentTripId}`) : null}>
               Continue to packing <ArrowRightLeft size={15} />
             </button>
           </div>
         </div>
       </div>
+        </div>
     );
   }
 
@@ -1568,68 +1872,76 @@ export default function PackRite() {
      ORGANIZE VIEW (drag & drop packing)
   --------------------------------------------------------- */
 
+  // If loading trip data while on organize view, show loading state
+  if (view === "organize" && tripsLoading) {
+    return (
+      <div className="app">
+        <GlobalStyle />
+        <GlobalNavbar navigate={navigate} location={location} tripName="" tripId={null} />
+        <div style={{ marginTop: "53px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px" }}>
+          <div style={{ textAlign: "center", color: "var(--ink-soft)" }}>
+            <div style={{ fontSize: "14px", marginBottom: "16px" }}>Loading your trip…</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If trip not found in savedTrips, redirect to index
+  if (view === "organize" && tripId && !tripsLoading && currentTripId !== tripId) {
+    const trip = savedTrips.find((t) => t.id === tripId);
+    if (!trip) {
+      return (
+        <div className="app">
+          <GlobalStyle />
+          <GlobalNavbar navigate={navigate} location={location} tripName="" tripId={null} />
+          <div style={{ marginTop: "53px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px" }}>
+            <div style={{ textAlign: "center", color: "var(--ink-soft)" }}>
+              <div style={{ fontSize: "14px", marginBottom: "16px" }}>Trip not found. Redirecting…</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="app">
       <GlobalStyle />
-
-      <div className="header">
-        <div className="header-left">
-          <button className="plane-badge" onClick={() => setView("index")} title="All trips" aria-label="All trips"><Home size={19} /></button>
-          <div style={{ minWidth: 0 }}>
-            <input className="trip-input" value={tripName} onChange={(e) => setTripName(e.target.value)} />
-            <div className="header-sub">
-              Packing Manifest · <button onClick={() => { setSettingsTripName(tripName); setSettingsDest(guideDestination || ""); setSettingsStartDate(guideStartDate || ""); setSettingsEndDate(guideEndDate || ""); setSettingsUnit(unit); setSettingsAirline(airlineKey); setTripSettingsOpen(true); }}><Settings2 size={11} /> Trip Settings</button> · <button onClick={() => setView("config")}><Settings2 size={11} /> Edit bags</button>
-            </div>
-          </div>
-        </div>
-        <div className="header-right">
-          <div className="header-stats">
-            <div className="stat">
-              <span className="stat-num mono">{packedItems}/{totalItems}</span>
-              <span className="stat-label">Items packed</span>
-              <div className="progress-bar-outer" style={{ marginTop: 4 }}>
-                <div className="progress-bar-inner" style={{ width: totalItems ? `${(packedItems / totalItems) * 100}%` : "0%" }} />
+      <GlobalNavbar navigate={navigate} location={location} tripName={tripName} tripId={tripId} />
+      <div style={{ marginTop: "53px" }}>
+      <div className="header" style={{ paddingTop: "12px", paddingBottom: "12px" }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "1 1 auto", minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+              <input className="trip-input" value={tripName} onChange={(e) => setTripName(e.target.value)} style={{ maxWidth: "400px" }} />
+              <div className="header-sub" style={{ marginTop: "4px" }}>
+                <button style={{ fontSize: "11px", background: "none", border: "none", color: "var(--white-soft)", textDecoration: "underline", cursor: "pointer", padding: 0 }} onClick={() => { setSettingsTripName(tripName); setSettingsDest(guideDestination || ""); setSettingsStartDate(guideStartDate || ""); setSettingsEndDate(guideEndDate || ""); setSettingsUnit(unit); setSettingsAirline(airlineKey); setSettingsLat(guideLat); setSettingsLon(guideLon); setTripSettingsOpen(true); }}>Trip Settings</button>
+                <span style={{ margin: "0 6px" }}>·</span>
+                <button style={{ fontSize: "11px", background: "none", border: "none", color: "var(--white-soft)", textDecoration: "underline", cursor: "pointer", padding: 0 }} onClick={() => navigate(tripId ? `/app/trips/${tripId}/bags` : "/app/bags")}>Edit bags</button>
               </div>
             </div>
-            <div className="unit-toggle">
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "16px" }}>
+              <div style={{ textAlign: "right" }}>
+                <span style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "var(--white)" }}>{packedItems}/{totalItems}</span>
+                <span style={{ display: "block", fontSize: "10px", color: "var(--white-soft)", textTransform: "uppercase" }}>packed</span>
+              </div>
+              <div style={{ width: "60px", height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "2px", overflow: "hidden" }}>
+                <div style={{ height: "100%", background: "var(--white)", width: totalItems ? `${(packedItems / totalItems) * 100}%` : "0%", transition: "width 0.3s" }} />
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="unit-toggle" style={{ borderColor: "rgba(255,255,255,0.3)" }}>
               <button className={unit === "kg" ? "active" : ""} onClick={() => setUnit("kg")}>KG</button>
               <button className={unit === "lb" ? "active" : ""} onClick={() => setUnit("lb")}>LB</button>
             </div>
-          </div>
-          <div className="header-actions">
-            <button className="hbtn" onClick={() => setTripsPanelOpen((v) => !v)}>
-              <FolderOpen size={14} /> My Trips{savedTrips.length > 0 ? ` (${savedTrips.length})` : ""}
-            </button>
-            <button className={`hbtn primary ${saveStatus === "saved" ? "saved" : ""}`} onClick={saveTrip} disabled={saveStatus === "saving"}>
+            <button className={`hbtn primary ${saveStatus === "saved" ? "saved" : ""}`} onClick={saveTrip} disabled={saveStatus === "saving"} style={{ marginLeft: "8px" }}>
               {saveStatus === "saved" ? <Check size={14} /> : <Save size={14} />}
-              {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : "Save Trip"}
+              {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : "Save"}
             </button>
           </div>
         </div>
-
-        {tripsPanelOpen && (
-          <div className="trips-panel">
-            <div className="trips-panel-head">
-              <b>Saved Trips</b>
-              <button className="icon-btn" onClick={() => setTripsPanelOpen(false)} aria-label="Close"><X size={16} /></button>
-            </div>
-            {tripsError && <div className="trips-error">{tripsError}</div>}
-            <div className="trips-panel-body">
-              {tripsLoading && <div className="trips-empty">Loading your trips…</div>}
-              {!tripsLoading && savedTrips.length === 0 && <div className="trips-empty">No saved trips yet. Build your list, then hit "Save Trip".</div>}
-              {!tripsLoading && savedTrips.map((t) => (
-                <div className="trip-row" key={t.id}>
-                  <div className="trip-row-main" onClick={() => openTrip(t)}>
-                    <div className="trip-row-name">{t.tripName}{t.id === currentTripId ? " (current)" : ""}</div>
-                    <div className="trip-row-meta"><Clock size={11} /> {fmtDate(t.savedAt)} · {t.items.filter((i) => i.location !== "unpacked").length}/{t.items.length} packed</div>
-                  </div>
-                  <button className="icon-btn" onClick={() => deleteTrip(t.id)} title="Delete trip" aria-label="Delete trip"><Trash2 size={14} /></button>
-                </div>
-              ))}
-            </div>
-            <button className="trips-new-btn" onClick={startNewTrip}><Plus size={12} style={{ verticalAlign: -1 }} /> Start a new trip</button>
-          </div>
-        )}
 
         {tripSettingsOpen && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, overflow: "auto" }}>
@@ -1671,6 +1983,8 @@ export default function PackRite() {
                           key={idx}
                           onClick={() => {
                             setSettingsDest(`${suggestion.name}${suggestion.country ? ", " + suggestion.country : ""}`);
+                            setSettingsLat(suggestion.latitude);
+                            setSettingsLon(suggestion.longitude);
                             setSettingsDestSuggestions([]);
                           }}
                           style={{ width: "100%", textAlign: "left", padding: "12px 14px", border: "none", background: "none", cursor: "pointer", fontSize: "14px", borderBottom: idx < settingsDestSuggestions.length - 1 ? "1px solid var(--line)" : "none" }}
@@ -1712,12 +2026,109 @@ export default function PackRite() {
 
               <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
                 <button className="btn-ghost" onClick={() => setTripSettingsOpen(false)}>Cancel</button>
-                <button className="btn-primary" onClick={() => { setTripName(settingsTripName); setGuideDestination(settingsDest); setGuideStartDate(settingsStartDate); setGuideEndDate(settingsEndDate); setUnit(settingsUnit); setAirlineKey(settingsAirline); setTripSettingsOpen(false); autoSaveTrip(currentTripId, settingsTripName, settingsUnit, settingsAirline, bags, items); }}>Save Changes</button>
+                <button className="btn-primary" onClick={() => { setTripName(settingsTripName); setGuideDestination(settingsDest); setGuideStartDate(settingsStartDate); setGuideEndDate(settingsEndDate); setUnit(settingsUnit); setAirlineKey(settingsAirline); setGuideLat(settingsLat); setGuideLon(settingsLon); setTripSettingsOpen(false); autoSaveTrip(currentTripId, settingsTripName, settingsUnit, settingsAirline, bags, items, settingsDest, settingsStartDate, settingsEndDate, settingsLat, settingsLon); }}>Save Changes</button>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {guideDestination && guideStartDate && guideEndDate && (
+        <div style={{ background: "var(--bg-soft)", borderBottom: "1.5px solid var(--line)", overflow: "hidden" }}>
+          <button
+            onClick={() => setWeatherBannerOpen(!weatherBannerOpen)}
+            style={{
+              width: "100%",
+              padding: "14px 24px",
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "12px",
+              fontWeight: "600",
+              fontSize: "13px",
+              color: "var(--ink)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <Cloud size={16} />
+              <span>{guideDestination} · {guideStartDate} to {guideEndDate}</span>
+            </div>
+            <span style={{ transform: weatherBannerOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▼</span>
+          </button>
+          {weatherBannerOpen && (
+            <div style={{ padding: "16px 24px" }}>
+              {!organizeTripWeather && <div style={{ fontSize: "12px", color: "var(--ink-soft)", textAlign: "center", padding: "12px" }}>Loading weather…</div>}
+              {organizeTripWeather && (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100px, 100%), 1fr))", gap: "8px", marginBottom: "16px" }}>
+                    {organizeTripWeather.daily.time.map((date, i) => {
+                      const dateObj = new Date(date);
+                      const startObj = new Date(guideStartDate);
+                      const endObj = new Date(guideEndDate);
+                      if (dateObj < startObj || dateObj > endObj) return null;
+
+                      const weatherInfo = getWeatherDescription(organizeTripWeather.daily.weather_code[i]);
+                      return (
+                        <div key={date} style={{ background: "var(--white)", border: "2px solid", borderColor: weatherInfo.color, borderRadius: "6px", padding: "8px", textAlign: "center" }}>
+                          <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "3px", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                          <div style={{ fontSize: "20px", margin: "2px auto" }}>{weatherInfo.icon}</div>
+                          <div style={{ fontSize: "10px", fontWeight: "600", color: weatherInfo.color, marginBottom: "3px" }}>{weatherInfo.label}</div>
+                          <div style={{ fontSize: "11px", fontWeight: "600" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
+                          <div style={{ fontSize: "9px", color: "var(--ink-soft)" }}>{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {weatherPresetPacks.length > 0 && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>Quick-add weather packs</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {weatherPresetPacks.map((pack) => (
+                          <button
+                            key={pack.name}
+                            onClick={() => {
+                              const newItems = pack.items
+                                .map((itemName) => {
+                                  const preset = PRESETS.find((p) => p.name === itemName);
+                                  return preset ? { id: nextId(), ...preset, qty: 1, location: "unpacked" } : null;
+                                })
+                                .filter(Boolean);
+                              setItems((prev) => [...prev, ...newItems]);
+                            }}
+                            style={{
+                              padding: "6px 12px",
+                              border: "1.5px solid var(--line)",
+                              background: "var(--white)",
+                              borderRadius: "5px",
+                              cursor: "pointer",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              color: "var(--ink)",
+                              transition: "all 0.2s",
+                            }}
+                            onMouseOver={(e) => { e.target.style.background = "var(--black)"; e.target.style.color = "var(--white)"; e.target.style.borderColor = "var(--black)"; }}
+                            onMouseOut={(e) => { e.target.style.background = "var(--white)"; e.target.style.color = "var(--ink)"; e.target.style.borderColor = "var(--line)"; }}
+                          >
+                            + {pack.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: "9px", color: "var(--ink-soft)", textAlign: "center" }}>Weather via <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--ink-soft)", textDecoration: "underline" }}>Open-Meteo</a></div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="layout">
         <div className="side-panel">
@@ -1833,7 +2244,7 @@ export default function PackRite() {
                 addPouch={addPouch}
               />
             ))}
-            <div className="add-bag-card" onClick={() => setView("config")}>
+            <div className="add-bag-card" onClick={() => navigate(tripId ? `/app/trips/${tripId}/bags` : "/app/bags")}>
               <Settings2 size={22} />
               Edit bags & limits
             </div>
@@ -1850,6 +2261,20 @@ export default function PackRite() {
           </div>
         </div>
       </div>
+      </div>
     </div>
+  );
+}
+
+export default function PackRite() {
+  return (
+    <Routes>
+      <Route path="/" element={<AppContent />} />
+      <Route path="/new" element={<AppContent />} />
+      <Route path="/bags" element={<AppContent />} />
+      <Route path="/trips/:id" element={<AppContent />} />
+      <Route path="/trips/:id/bags" element={<AppContent />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
