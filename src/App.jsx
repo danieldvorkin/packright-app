@@ -307,8 +307,9 @@ function freshBagsFromPreset(key) {
 
 async function fetchWeather(lat, lon, startDate, endDate) {
   try {
+    const dateParam = startDate && endDate ? `&start_date=${startDate}&end_date=${endDate}` : "";
     const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto${dateParam}`
     );
     if (!response.ok) {
       console.warn("Weather API returned status:", response.status);
@@ -2058,16 +2059,6 @@ function AppContent() {
           </div>
         )}
       </div>
-
-      {/* Debug: Show trip data status */}
-      {view === "organize" && (
-        <div style={{ padding: "8px 24px", background: "#f0f0f0", fontSize: "11px", color: "#666", borderBottom: "1px solid #ddd" }}>
-          <div>Trip: dest="{guideDestination}" | start="{guideStartDate}" | end="{guideEndDate}"</div>
-          {organizeTripWeather && (
-            <div>Weather: {organizeTripWeather.daily.time.length} total days | Times: {organizeTripWeather.daily.time.slice(0, 8).join(", ")}</div>
-          )}
-        </div>
-      )}
 
       {guideDestination && guideStartDate && guideEndDate && (
         <div style={{ background: "var(--bg-soft)", borderBottom: "1.5px solid var(--line)", overflow: "hidden" }}>
