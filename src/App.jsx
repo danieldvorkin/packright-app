@@ -309,7 +309,7 @@ async function fetchWeather(lat, lon, startDate, endDate) {
   try {
     const dateParam = startDate && endDate ? `&start_date=${startDate}&end_date=${endDate}` : "";
     const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,relative_humidity_2m_max&timezone=auto${dateParam}`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,wind_direction_10m_dominant,relative_humidity_2m_max,cloud_cover,uv_index_max,pressure_msl&timezone=auto${dateParam}`
     );
     if (!response.ok) {
       console.warn("Weather API returned status:", response.status);
@@ -333,7 +333,11 @@ function createDefaultWeather(lat, lon, startDate, endDate) {
   const precip = [];
   const times = [];
   const winds = [];
+  const windDirs = [];
   const humidities = [];
+  const clouds = [];
+  const uvIndex = [];
+  const pressure = [];
 
   // Simple climate heuristic based on latitude
   let baseTemp = 15; // temperate
@@ -362,7 +366,11 @@ function createDefaultWeather(lat, lon, startDate, endDate) {
     codes.push(Math.random() > 0.7 ? 80 : 0); // 30% chance of rain
     precip.push(Math.random() > 0.7 ? 5 : 0);
     winds.push(Math.round(Math.random() * 20 + 5)); // 5-25 km/h
+    windDirs.push(Math.round(Math.random() * 360)); // 0-360 degrees
     humidities.push(Math.round(Math.random() * 40 + 40)); // 40-80%
+    clouds.push(Math.round(Math.random() * 100)); // 0-100%
+    uvIndex.push(Math.round(Math.random() * 10)); // 0-10
+    pressure.push(Math.round(Math.random() * 20 + 1010)); // ~1010 hPa
   }
 
   return {
@@ -373,7 +381,11 @@ function createDefaultWeather(lat, lon, startDate, endDate) {
       temperature_2m_min: temps.map(t => Math.round(t - 3)),
       precipitation_sum: precip,
       windspeed_10m_max: winds,
+      wind_direction_10m_dominant: windDirs,
       relative_humidity_2m_max: humidities,
+      cloud_cover: clouds,
+      uv_index_max: uvIndex,
+      pressure_msl: pressure,
     }
   };
 }
@@ -2123,7 +2135,7 @@ function AppContent() {
               {!organizeTripWeather && <div style={{ fontSize: "12px", color: "var(--ink-soft)", textAlign: "center", padding: "12px" }}>Loading weather…</div>}
               {organizeTripWeather && (
                 <>
-                  <div style={{ overflowX: "auto", overflowY: "hidden", marginBottom: "16px", paddingBottom: "12px", WebkitOverflowScrolling: "touch", width: "100%", maxWidth: "100%" }}>
+                  <div style={{ overflowX: "auto", overflowY: "hidden", marginBottom: "16px", paddingTop: "20px", paddingBottom: "20px", WebkitOverflowScrolling: "touch", width: "100%" }}>
                     <div style={{ display: "flex", gap: "12px", flexWrap: "nowrap", width: "fit-content", padding: "0 12px" }}>
                       {organizeTripWeather.daily.time.map((date, i) => {
                         // Compare dates as strings to avoid timezone issues
@@ -2135,11 +2147,20 @@ function AppContent() {
                         const dateObj = new Date(year, month - 1, day);
                         const precip = organizeTripWeather.daily.precipitation_sum[i];
                         const wind = organizeTripWeather.daily.windspeed_10m_max[i];
+                        const windDir = organizeTripWeather.daily.wind_direction_10m_dominant[i];
                         const humidity = organizeTripWeather.daily.relative_humidity_2m_max[i];
+                        const cloud = organizeTripWeather.daily.cloud_cover[i];
+                        const uv = organizeTripWeather.daily.uv_index_max[i];
+                        const press = organizeTripWeather.daily.pressure_msl[i];
                         const isFlipped = flippedWeatherCards[date];
 
+                        const getWindDirection = (deg) => {
+                          const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+                          return dirs[Math.round((deg % 360) / 45) % 8];
+                        };
+
                         return (
-                          <div key={date} style={{ perspective: "1000px", width: "140px", height: "180px", cursor: "pointer" }} onClick={() => setFlippedWeatherCards(prev => ({ ...prev, [date]: !prev[date] }))}>
+                          <div key={date} style={{ perspective: "1000px", width: "180px", height: "200px", cursor: "pointer" }} onClick={() => setFlippedWeatherCards(prev => ({ ...prev, [date]: !prev[date] }))}>
                             <div style={{
                               position: "relative",
                               width: "100%",
@@ -2165,17 +2186,21 @@ function AppContent() {
                                 justifyContent: "space-between",
                                 boxSizing: "border-box"
                               }}>
-                                <div>
-                                  <div style={{ fontSize: "10px", color: "var(--ink-soft)", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short" })}</div>
-                                  <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "4px" }}>{dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
+                                <div style={{ fontSize: "9px" }}>
+                                  <div style={{ fontWeight: "600", color: "var(--ink)" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short" })}</div>
+                                  <div style={{ color: "var(--ink-soft)", fontSize: "8px" }}>{dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
                                 </div>
-                                <div style={{ fontSize: "28px", margin: "0 auto" }}>{weatherInfo.icon}</div>
-                                <div>
-                                  <div style={{ fontSize: "9px", fontWeight: "600", color: weatherInfo.color, minHeight: "18px" }}>{weatherInfo.label}</div>
-                                  <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "2px" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
-                                  <div style={{ fontSize: "10px", color: "var(--ink-soft)" }}>{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
+                                <div style={{ fontSize: "32px", margin: "4px auto" }}>{weatherInfo.icon}</div>
+                                <div style={{ fontSize: "8px", lineHeight: "1.3" }}>
+                                  <div style={{ fontWeight: "600", color: weatherInfo.color, minHeight: "14px" }}>{weatherInfo.label}</div>
+                                  <div style={{ fontSize: "12px", fontWeight: "700" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
+                                  <div style={{ color: "var(--ink-soft)", fontSize: "7px" }}>↓{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
                                 </div>
-                                {precip > 0 && <div style={{ fontSize: "8px", color: "#4A90E2" }}>💧 {Math.round(precip)}mm</div>}
+                                <div style={{ fontSize: "7px", lineHeight: "1.2", color: "var(--ink-soft)" }}>
+                                  {precip > 0 && <div>💧 {Math.round(precip)}mm</div>}
+                                  <div>💨 {Math.round(wind)}km/h {getWindDirection(windDir)}</div>
+                                  <div>☁️ {cloud}%</div>
+                                </div>
                               </div>
 
                               {/* Back */}
@@ -2196,22 +2221,31 @@ function AppContent() {
                                 boxSizing: "border-box",
                                 transform: "rotateY(180deg)"
                               }}>
-                                <div style={{ fontSize: "10px", fontWeight: "600", color: "var(--ink-soft)" }}>Details</div>
-                                <div>
-                                  <div style={{ fontSize: "9px", marginBottom: "8px" }}>
-                                    <div style={{ color: "var(--ink-soft)", marginBottom: "2px" }}>Wind</div>
-                                    <div style={{ fontWeight: "600", color: "var(--ink)" }}>{Math.round(wind)} km/h</div>
+                                <div style={{ fontSize: "9px", fontWeight: "600", color: weatherInfo.color }}>Detailed</div>
+                                <div style={{ fontSize: "8px", lineHeight: "1.4", color: "var(--ink)" }}>
+                                  <div style={{ marginBottom: "4px", borderBottom: "1px solid var(--line)", paddingBottom: "4px" }}>
+                                    <div style={{ color: "var(--ink-soft)", fontSize: "7px" }}>WIND</div>
+                                    <div style={{ fontWeight: "600" }}>{Math.round(wind)} km/h</div>
+                                    <div style={{ fontSize: "7px", color: "var(--ink-soft)" }}>→ {getWindDirection(windDir)}</div>
                                   </div>
-                                  <div style={{ fontSize: "9px", marginBottom: "8px" }}>
-                                    <div style={{ color: "var(--ink-soft)", marginBottom: "2px" }}>Humidity</div>
-                                    <div style={{ fontWeight: "600", color: "var(--ink)" }}>{humidity}%</div>
+                                  <div style={{ marginBottom: "4px", borderBottom: "1px solid var(--line)", paddingBottom: "4px" }}>
+                                    <div style={{ color: "var(--ink-soft)", fontSize: "7px" }}>HUMIDITY</div>
+                                    <div style={{ fontWeight: "600" }}>{humidity}%</div>
                                   </div>
-                                  <div style={{ fontSize: "9px" }}>
-                                    <div style={{ color: "var(--ink-soft)", marginBottom: "2px" }}>Precip</div>
-                                    <div style={{ fontWeight: "600", color: "var(--ink)" }}>{Math.round(precip)}mm</div>
+                                  <div style={{ marginBottom: "4px", borderBottom: "1px solid var(--line)", paddingBottom: "4px" }}>
+                                    <div style={{ color: "var(--ink-soft)", fontSize: "7px" }}>CLOUDS</div>
+                                    <div style={{ fontWeight: "600" }}>{cloud}%</div>
+                                  </div>
+                                  <div style={{ marginBottom: "4px", borderBottom: "1px solid var(--line)", paddingBottom: "4px" }}>
+                                    <div style={{ color: "var(--ink-soft)", fontSize: "7px" }}>UV INDEX</div>
+                                    <div style={{ fontWeight: "600" }}>{uv}</div>
+                                  </div>
+                                  <div>
+                                    <div style={{ color: "var(--ink-soft)", fontSize: "7px" }}>PRESSURE</div>
+                                    <div style={{ fontWeight: "600" }}>{press} hPa</div>
                                   </div>
                                 </div>
-                                <div style={{ fontSize: "12px" }}>👇</div>
+                                <div style={{ fontSize: "10px" }}>👆</div>
                               </div>
                             </div>
                           </div>
