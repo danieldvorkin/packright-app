@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, Routes, Route, useParams, Navigate, useLocation } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import {
   Plane, Briefcase, Package, Shirt, Footprints, Sparkles, Laptop, FileText, Watch,
   Plus, X, Search, GripVertical, Info, ChevronDown, ChevronLeft, Scale, AlertTriangle,
@@ -1459,10 +1461,9 @@ function AppContent() {
       if (!bagNameInput.trim()) return;
       const ok = await saveBagConfiguration(bagNameInput);
       if (ok) {
-        setSaveMessage("✓ Bag configuration saved!");
+        toast.success("Bag configuration saved!");
         setBagNameInput("");
         setSaveAsOpen(false);
-        setTimeout(() => setSaveMessage(""), 2000);
       }
     };
 
@@ -1795,10 +1796,9 @@ function AppContent() {
       if (!bagNameInput.trim()) return;
       const ok = await saveBagConfiguration(bagNameInput);
       if (ok) {
-        setSaveMessage("✓ Bag configuration saved!");
+        toast.success("Bag configuration saved!");
         setBagNameInput("");
         setSaveAsOpen(false);
-        setTimeout(() => setSaveMessage(""), 2000);
       }
     };
 
@@ -2072,7 +2072,7 @@ function AppContent() {
                   e.stopPropagation();
                   const text = `${guideDestination} · ${guideStartDate} to ${guideEndDate}`;
                   navigator.clipboard.writeText(text);
-                  alert("Copied to clipboard!");
+                  toast.success("Copied to clipboard!", { autoClose: 2000 });
                 }}
                 style={{
                   background: "none",
@@ -2302,13 +2302,27 @@ function AppContent() {
 
 export default function PackRite() {
   return (
-    <Routes>
-      <Route path="/" element={<AppContent />} />
-      <Route path="/new" element={<AppContent />} />
-      <Route path="/bags" element={<AppContent />} />
-      <Route path="/trips/:id" element={<AppContent />} />
-      <Route path="/trips/:id/bags" element={<AppContent />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+      <Routes>
+        <Route path="/" element={<AppContent />} />
+        <Route path="/new" element={<AppContent />} />
+        <Route path="/bags" element={<AppContent />} />
+        <Route path="/trips/:id" element={<AppContent />} />
+        <Route path="/trips/:id/bags" element={<AppContent />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
