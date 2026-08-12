@@ -2067,6 +2067,30 @@ function AppContent() {
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <Cloud size={16} />
               <span>{guideDestination} · {guideStartDate} to {guideEndDate}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const text = `${guideDestination} · ${guideStartDate} to ${guideEndDate}`;
+                  navigator.clipboard.writeText(text);
+                  alert("Copied to clipboard!");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--ink-soft)",
+                  padding: "4px 8px",
+                  display: "flex",
+                  alignItems: "center",
+                  fontSize: "12px",
+                  transition: "color 0.2s"
+                }}
+                onMouseEnter={(e) => e.target.style.color = "var(--ink)"}
+                onMouseLeave={(e) => e.target.style.color = "var(--ink-soft)"}
+                title="Copy trip details"
+              >
+                📋
+              </button>
             </div>
             <span style={{ transform: weatherBannerOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▼</span>
           </button>
