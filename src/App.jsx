@@ -610,6 +610,15 @@ export default function PackRight() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (view === "organize" && currentTripId && tripName) {
+      const autoSaveTimer = setTimeout(() => {
+        autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items);
+      }, 1000);
+      return () => clearTimeout(autoSaveTimer);
+    }
+  }, [tripName, unit, airlineKey, bags, items, view, currentTripId]);
+
   /* ---- derived ---- */
 
   const topBags = bags.filter((b) => !b.parentId);
@@ -729,18 +738,28 @@ export default function PackRight() {
     }
   };
 
+  const autoSaveTrip = async (tripId, name, u, airKey, bagsList, itemsList) => {
+    try {
+      const record = { id: tripId || `trip-${Date.now()}`, tripName: name, unit: u, airlineKey: airKey, bags: bagsList, items: itemsList, savedAt: new Date().toISOString() };
+      const existingIdx = savedTrips.findIndex((t) => t.id === record.id);
+      const nextList = existingIdx >= 0 ? savedTrips.map((t, i) => (i === existingIdx ? record : t)) : [record, ...savedTrips];
+      await persistTrips(nextList);
+      if (!tripId) {
+        setCurrentTripId(record.id);
+      }
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1500);
+    } catch (e) {
+      console.error("Auto-save failed:", e);
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }
+  };
+
   const saveTrip = async () => {
     setSaveStatus("saving");
     setTripsError(null);
-    const record = { id: currentTripId || `trip-${Date.now()}`, tripName, unit, airlineKey, bags, items, savedAt: new Date().toISOString() };
-    const existingIdx = savedTrips.findIndex((t) => t.id === record.id);
-    const nextList = existingIdx >= 0 ? savedTrips.map((t, i) => (i === existingIdx ? record : t)) : [record, ...savedTrips];
-    const ok = await persistTrips(nextList);
-    if (ok) {
-      setCurrentTripId(record.id);
-      setSaveStatus("saved");
-      setTimeout(() => setSaveStatus("idle"), 2000);
-    } else setSaveStatus("error");
+    await autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items);
   };
 
   const openTrip = (trip) => {
