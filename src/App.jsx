@@ -19,6 +19,19 @@ const CATEGORIES = {
   accessories: { label: "Accessories", icon: Watch,      tip: "Fill shoes and gaps with small accessories — dead space is wasted capacity." },
 };
 
+const DEFAULT_TRIP_ITEMS = [
+  "Underwear",
+  "Socks",
+  "T-shirt",
+  "Jeans",
+  "Sneakers",
+  "Toothbrush + paste",
+  "Deodorant",
+  "Phone charger",
+  "Passport",
+  "Travel wallet",
+];
+
 const PRESETS = [
   { name: "T-shirt", category: "clothing", weight: 150 },
   { name: "Long-sleeve shirt", category: "clothing", weight: 200 },
@@ -427,6 +440,7 @@ export default function PackRight() {
   const [currentTripId, setCurrentTripId] = useState(null);
 
   const [search, setSearch] = useState("");
+  const [quickAddSearch, setQuickAddSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [dragOverZone, setDragOverZone] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -532,7 +546,7 @@ export default function PackRight() {
     setAddOpen(false);
   };
   const addPreset = (p) => setItems((prev) => [...prev, { id: nextId(), ...p, qty: 1, location: "unpacked" }]);
-  const availablePresets = PRESETS.filter((p) => !items.some((i) => i.name === p.name && i.location === "unpacked"));
+  const availablePresets = PRESETS.filter((p) => !items.some((i) => i.name === p.name && i.location === "unpacked") && p.name.toLowerCase().includes(quickAddSearch.toLowerCase()));
 
   /* ---- bag actions ---- */
 
@@ -559,7 +573,18 @@ export default function PackRight() {
     setUnit("kg");
     setAirlineKey("us_major");
     setBags(freshBagsFromPreset("us_major"));
-    setItems([]);
+    const defaultItems = DEFAULT_TRIP_ITEMS.map((itemName) => {
+      const preset = PRESETS.find((p) => p.name === itemName);
+      return {
+        id: nextId(),
+        name: itemName,
+        category: preset?.category || "clothing",
+        weight: preset?.weight || 200,
+        qty: 1,
+        location: "unpacked",
+      };
+    });
+    setItems(defaultItems);
     setCurrentTripId(null);
     setTripsPanelOpen(false);
     setBagNameInput("");
@@ -1512,13 +1537,26 @@ export default function PackRight() {
               ))}
             </div>
 
-            {availablePresets.length > 0 && (
+            {PRESETS.length > 0 && (
               <>
                 <div className="section-label">Quick add ({availablePresets.length})</div>
+                <div style={{ marginBottom: "12px" }}>
+                  <input
+                    type="text"
+                    placeholder="Search items..."
+                    value={quickAddSearch}
+                    onChange={(e) => setQuickAddSearch(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "5px", border: "1.5px solid var(--line)", fontSize: "12px", minHeight: "32px" }}
+                  />
+                </div>
                 <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "8px" }}>
-                  {availablePresets.map((p) => (
-                    <span key={p.name} className="preset-chip" onClick={() => addPreset(p)}><Plus size={11} /> {p.name}</span>
-                  ))}
+                  {availablePresets.length > 0 ? (
+                    availablePresets.map((p) => (
+                      <span key={p.name} className="preset-chip" onClick={() => addPreset(p)}><Plus size={11} /> {p.name}</span>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: "12px", color: "var(--ink-soft)", padding: "12px 8px", textAlign: "center" }}>No matching items</div>
+                  )}
                 </div>
               </>
             )}
