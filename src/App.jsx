@@ -2059,6 +2059,13 @@ function AppContent() {
         )}
       </div>
 
+      {/* Debug: Show trip data status */}
+      {view === "organize" && (
+        <div style={{ padding: "8px 24px", background: "#f0f0f0", fontSize: "11px", color: "#666", borderBottom: "1px solid #ddd" }}>
+          Trip data: dest="{guideDestination}" | start="{guideStartDate}" | end="{guideEndDate}" | weather={organizeTripWeather ? "loaded" : "null"}
+        </div>
+      )}
+
       {guideDestination && guideStartDate && guideEndDate && (
         <div style={{ background: "var(--bg-soft)", borderBottom: "1.5px solid var(--line)", overflow: "hidden" }}>
           <button
