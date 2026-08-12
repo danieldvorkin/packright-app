@@ -2116,25 +2116,26 @@ function AppContent() {
               {!organizeTripWeather && <div style={{ fontSize: "12px", color: "var(--ink-soft)", textAlign: "center", padding: "12px" }}>Loading weather…</div>}
               {organizeTripWeather && (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100px, 100%), 1fr))", gap: "8px", marginBottom: "16px" }}>
-                    {organizeTripWeather.daily.time.map((date, i) => {
-                      // Compare dates as strings to avoid timezone issues
-                      if (date < guideStartDate || date > guideEndDate) return null;
+                  <div style={{ overflowX: "auto", overflowY: "hidden", marginBottom: "16px", paddingBottom: "8px" }}>
+                    <div style={{ display: "flex", gap: "8px", minWidth: "min-content" }}>
+                      {organizeTripWeather.daily.time.map((date, i) => {
+                        // Compare dates as strings to avoid timezone issues
+                        if (date < guideStartDate || date > guideEndDate) return null;
 
-                      const weatherInfo = getWeatherDescription(organizeTripWeather.daily.weather_code[i]);
-                      // Parse date string safely without timezone conversion
-                      const [year, month, day] = date.split('-').map(Number);
-                      const dateObj = new Date(year, month - 1, day);
-                      return (
-                        <div key={date} style={{ background: "var(--white)", border: "2px solid", borderColor: weatherInfo.color, borderRadius: "6px", padding: "8px", textAlign: "center" }}>
-                          <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "3px", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
-                          <div style={{ fontSize: "20px", margin: "2px auto" }}>{weatherInfo.icon}</div>
-                          <div style={{ fontSize: "10px", fontWeight: "600", color: weatherInfo.color, marginBottom: "3px" }}>{weatherInfo.label}</div>
-                          <div style={{ fontSize: "11px", fontWeight: "600" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
-                          <div style={{ fontSize: "9px", color: "var(--ink-soft)" }}>{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
-                        </div>
-                      );
-                    })}
+                        const weatherInfo = getWeatherDescription(organizeTripWeather.daily.weather_code[i]);
+                        // Parse date string safely without timezone conversion
+                        const [year, month, day] = date.split('-').map(Number);
+                        const dateObj = new Date(year, month - 1, day);
+                        return (
+                          <div key={date} style={{ background: "var(--white)", border: "2px solid", borderColor: weatherInfo.color, borderRadius: "6px", padding: "8px", textAlign: "center", minWidth: "100px", flexShrink: 0 }}>
+                            <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "3px", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                            <div style={{ fontSize: "20px", margin: "2px auto" }}>{weatherInfo.icon}</div>
+                            <div style={{ fontSize: "10px", fontWeight: "600", color: weatherInfo.color, marginBottom: "3px" }}>{weatherInfo.label}</div>
+                            <div style={{ fontSize: "11px", fontWeight: "600" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
+                            <div style={{ fontSize: "9px", color: "var(--ink-soft)" }}>{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
+                          </div>
+                        );
+                      }).filter(Boolean).slice(0, 7)}
                   </div>
 
                   {weatherPresetPacks.length > 0 && (
