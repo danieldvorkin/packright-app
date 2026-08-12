@@ -886,17 +886,35 @@ function AppContent() {
   }, [tripId, savedTrips, tripsLoading, currentTripId]);
 
   useEffect(() => {
-    if (guideDestination && guideStartDate && guideEndDate && guideLat && guideLon) {
+    // Fetch weather if we have dates and destination (even if lat/lon still loading)
+    if (guideStartDate && guideEndDate && guideDestination) {
       (async () => {
-        const weather = await fetchWeather(guideLat, guideLon, guideStartDate, guideEndDate);
-        setOrganizeTripWeather(weather);
-        if (weather) {
-          const packs = getWeatherPresetPacks(weather);
-          setWeatherPresetPacks(packs);
+        let lat = guideLat;
+        let lon = guideLon;
+
+        // If we don't have coordinates yet, try to geocode
+        if (!lat || !lon) {
+          const coords = await geocodeDestination(guideDestination);
+          if (coords) {
+            lat = coords.lat;
+            lon = coords.lon;
+            setGuideLat(coords.lat);
+            setGuideLon(coords.lon);
+          }
+        }
+
+        // Fetch weather if we have coordinates
+        if (lat && lon) {
+          const weather = await fetchWeather(lat, lon, guideStartDate, guideEndDate);
+          setOrganizeTripWeather(weather);
+          if (weather) {
+            const packs = getWeatherPresetPacks(weather);
+            setWeatherPresetPacks(packs);
+          }
         }
       })();
     }
-  }, [guideDestination, guideStartDate, guideEndDate, guideLat, guideLon]);
+  }, [guideDestination, guideStartDate, guideEndDate]);
 
   /* ---- derived ---- */
 
