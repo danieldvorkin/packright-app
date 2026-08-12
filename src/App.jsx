@@ -4,6 +4,7 @@ import {
   Plus, X, Search, GripVertical, Info, ChevronDown, ChevronLeft, Scale, AlertTriangle,
   Trash2, PackageCheck, Save, FolderOpen, Check, Clock, ArrowRightLeft, Settings2, Home, Cloud, Thermometer, Zap
 } from "lucide-react";
+import { Landing } from "./Marketing";
 
 /* ---------------------------------------------------------
    DATA
@@ -350,7 +351,7 @@ function BagCard({
 --------------------------------------------------------- */
 
 export default function PackRight() {
-  const [view, setView] = useState("index"); // index | config | organize | select-bags | guided
+  const [view, setView] = useState("landing"); // landing | index | config | organize | select-bags | guided
 
   const [tripName, setTripName] = useState("New trip");
   const [unit, setUnit] = useState("kg");
@@ -1123,6 +1124,14 @@ export default function PackRight() {
   }
 
   /* ---------------------------------------------------------
+     LANDING PAGE
+  --------------------------------------------------------- */
+
+  if (view === "landing") {
+    return <Landing />;
+  }
+
+  /* ---------------------------------------------------------
      INDEX VIEW
   --------------------------------------------------------- */
 
@@ -1135,6 +1144,9 @@ export default function PackRight() {
             <div className="plane-badge"><Plane size={24} /></div>
             <h1>PackRight</h1>
             <p>Your trips, your bags, packed right — every time.</p>
+            <div style={{ marginTop: "24px" }}>
+              <button className="btn-primary" onClick={() => setView("landing")} style={{ marginRight: "8px" }}>Learn More</button>
+            </div>
           </div>
 
           <div className="index-grid">
