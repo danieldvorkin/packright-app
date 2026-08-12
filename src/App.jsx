@@ -309,7 +309,7 @@ async function fetchWeather(lat, lon, startDate, endDate) {
   try {
     const dateParam = startDate && endDate ? `&start_date=${startDate}&end_date=${endDate}` : "";
     const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto${dateParam}`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,relative_humidity_2m_max&timezone=auto${dateParam}`
     );
     if (!response.ok) {
       console.warn("Weather API returned status:", response.status);
@@ -332,6 +332,8 @@ function createDefaultWeather(lat, lon, startDate, endDate) {
   const codes = [];
   const precip = [];
   const times = [];
+  const winds = [];
+  const humidities = [];
 
   // Simple climate heuristic based on latitude
   let baseTemp = 15; // temperate
@@ -359,6 +361,8 @@ function createDefaultWeather(lat, lon, startDate, endDate) {
     temps.push(baseTemp + (Math.random() * 10 - 5));
     codes.push(Math.random() > 0.7 ? 80 : 0); // 30% chance of rain
     precip.push(Math.random() > 0.7 ? 5 : 0);
+    winds.push(Math.round(Math.random() * 20 + 5)); // 5-25 km/h
+    humidities.push(Math.round(Math.random() * 40 + 40)); // 40-80%
   }
 
   return {
@@ -368,6 +372,8 @@ function createDefaultWeather(lat, lon, startDate, endDate) {
       temperature_2m_max: temps.map(t => Math.round(t + 5)),
       temperature_2m_min: temps.map(t => Math.round(t - 3)),
       precipitation_sum: precip,
+      windspeed_10m_max: winds,
+      relative_humidity_2m_max: humidities,
     }
   };
 }
@@ -830,6 +836,7 @@ function AppContent() {
   const [weatherBannerOpen, setWeatherBannerOpen] = useState(true);
   const [organizeTripWeather, setOrganizeTripWeather] = useState(null);
   const [weatherPresetPacks, setWeatherPresetPacks] = useState([]);
+  const [flippedWeatherCards, setFlippedWeatherCards] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -2116,8 +2123,8 @@ function AppContent() {
               {!organizeTripWeather && <div style={{ fontSize: "12px", color: "var(--ink-soft)", textAlign: "center", padding: "12px" }}>Loading weather…</div>}
               {organizeTripWeather && (
                 <>
-                  <div style={{ overflowX: "auto", overflowY: "hidden", marginBottom: "16px", paddingBottom: "8px" }}>
-                    <div style={{ display: "flex", gap: "8px", minWidth: "min-content" }}>
+                  <div style={{ overflowX: "auto", overflowY: "hidden", marginBottom: "16px", paddingBottom: "12px", WebkitOverflowScrolling: "touch", width: "100%", maxWidth: "100%" }}>
+                    <div style={{ display: "flex", gap: "12px", flexWrap: "nowrap", width: "fit-content", padding: "0 12px" }}>
                       {organizeTripWeather.daily.time.map((date, i) => {
                         // Compare dates as strings to avoid timezone issues
                         if (date < guideStartDate || date > guideEndDate) return null;
@@ -2126,16 +2133,90 @@ function AppContent() {
                         // Parse date string safely without timezone conversion
                         const [year, month, day] = date.split('-').map(Number);
                         const dateObj = new Date(year, month - 1, day);
+                        const precip = organizeTripWeather.daily.precipitation_sum[i];
+                        const wind = organizeTripWeather.daily.windspeed_10m_max[i];
+                        const humidity = organizeTripWeather.daily.relative_humidity_2m_max[i];
+                        const isFlipped = flippedWeatherCards[date];
+
                         return (
-                          <div key={date} style={{ background: "var(--white)", border: "2px solid", borderColor: weatherInfo.color, borderRadius: "6px", padding: "8px", textAlign: "center", minWidth: "100px", flexShrink: 0 }}>
-                            <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "3px", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
-                            <div style={{ fontSize: "20px", margin: "2px auto" }}>{weatherInfo.icon}</div>
-                            <div style={{ fontSize: "10px", fontWeight: "600", color: weatherInfo.color, marginBottom: "3px" }}>{weatherInfo.label}</div>
-                            <div style={{ fontSize: "11px", fontWeight: "600" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
-                            <div style={{ fontSize: "9px", color: "var(--ink-soft)" }}>{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
+                          <div key={date} style={{ perspective: "1000px", width: "140px", height: "180px", cursor: "pointer" }} onClick={() => setFlippedWeatherCards(prev => ({ ...prev, [date]: !prev[date] }))}>
+                            <div style={{
+                              position: "relative",
+                              width: "100%",
+                              height: "100%",
+                              transition: "transform 0.6s",
+                              transformStyle: "preserve-3d",
+                              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)"
+                            }}>
+                              {/* Front */}
+                              <div style={{
+                                position: "absolute",
+                                width: "100%",
+                                height: "100%",
+                                backfaceVisibility: "hidden",
+                                background: "var(--white)",
+                                border: "2px solid",
+                                borderColor: weatherInfo.color,
+                                borderRadius: "8px",
+                                padding: "12px",
+                                textAlign: "center",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                                boxSizing: "border-box"
+                              }}>
+                                <div>
+                                  <div style={{ fontSize: "10px", color: "var(--ink-soft)", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short" })}</div>
+                                  <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "4px" }}>{dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
+                                </div>
+                                <div style={{ fontSize: "28px", margin: "0 auto" }}>{weatherInfo.icon}</div>
+                                <div>
+                                  <div style={{ fontSize: "9px", fontWeight: "600", color: weatherInfo.color, minHeight: "18px" }}>{weatherInfo.label}</div>
+                                  <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "2px" }}>{Math.round(organizeTripWeather.daily.temperature_2m_max[i])}°</div>
+                                  <div style={{ fontSize: "10px", color: "var(--ink-soft)" }}>{Math.round(organizeTripWeather.daily.temperature_2m_min[i])}°</div>
+                                </div>
+                                {precip > 0 && <div style={{ fontSize: "8px", color: "#4A90E2" }}>💧 {Math.round(precip)}mm</div>}
+                              </div>
+
+                              {/* Back */}
+                              <div style={{
+                                position: "absolute",
+                                width: "100%",
+                                height: "100%",
+                                backfaceVisibility: "hidden",
+                                background: "var(--white)",
+                                border: "2px solid",
+                                borderColor: weatherInfo.color,
+                                borderRadius: "8px",
+                                padding: "12px",
+                                textAlign: "center",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                                boxSizing: "border-box",
+                                transform: "rotateY(180deg)"
+                              }}>
+                                <div style={{ fontSize: "10px", fontWeight: "600", color: "var(--ink-soft)" }}>Details</div>
+                                <div>
+                                  <div style={{ fontSize: "9px", marginBottom: "8px" }}>
+                                    <div style={{ color: "var(--ink-soft)", marginBottom: "2px" }}>Wind</div>
+                                    <div style={{ fontWeight: "600", color: "var(--ink)" }}>{Math.round(wind)} km/h</div>
+                                  </div>
+                                  <div style={{ fontSize: "9px", marginBottom: "8px" }}>
+                                    <div style={{ color: "var(--ink-soft)", marginBottom: "2px" }}>Humidity</div>
+                                    <div style={{ fontWeight: "600", color: "var(--ink)" }}>{humidity}%</div>
+                                  </div>
+                                  <div style={{ fontSize: "9px" }}>
+                                    <div style={{ color: "var(--ink-soft)", marginBottom: "2px" }}>Precip</div>
+                                    <div style={{ fontWeight: "600", color: "var(--ink)" }}>{Math.round(precip)}mm</div>
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: "12px" }}>👇</div>
+                              </div>
+                            </div>
                           </div>
                         );
-                      }).filter(Boolean).slice(0, 7)}
+                      }).filter(Boolean)}
                     </div>
                   </div>
 
