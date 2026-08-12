@@ -22,11 +22,11 @@ export function Landing() {
 
       <nav style={{ background: "var(--black)", color: "var(--white)", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px" }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "20px", fontWeight: "700", textTransform: "uppercase", textDecoration: "none", color: "var(--white)" }}>
-          <Plane size={24} /> PackRight
+          <Plane size={24} /> PackRite
         </a>
         <div style={{ display: "flex", gap: "20px", fontSize: "14px", alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>How it works</button>
-          <button onClick={() => document.getElementById("why")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>Why PackRight</button>
+          <button onClick={() => document.getElementById("why")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>Why PackRite</button>
           <button onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>FAQ</button>
           <a href="/app" style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px", textDecoration: "none", display: "inline-block" }}>Open App</a>
         </div>
@@ -44,7 +44,7 @@ export function Landing() {
       </section>
 
       <section id="why" style={{ padding: "80px 40px", maxWidth: "1200px", margin: "0 auto" }}>
-        <h2 style={{ fontSize: "32px", marginBottom: "48px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.03em" }}>Why PackRight?</h2>
+        <h2 style={{ fontSize: "32px", marginBottom: "48px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.03em" }}>Why PackRite?</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "32px" }}>
           <div>
             <CheckCircle size={40} style={{ marginBottom: "16px", color: "var(--black)" }} />
@@ -97,7 +97,7 @@ export function Landing() {
           <h2 style={{ fontSize: "32px", marginBottom: "48px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.03em" }}>Frequently Asked Questions</h2>
           <div style={{ display: "grid", gap: "24px" }}>
             <FAQItem question="Is my data saved?" answer="Yes! All your trips, bags, and configurations are saved locally in your browser. Your data never leaves your device — everything is stored securely on your computer." />
-            <FAQItem question="Can I use this offline?" answer="PackRight works best online for weather data. However, you can still access and manage saved trips offline if they were previously loaded." />
+            <FAQItem question="Can I use this offline?" answer="PackRite works best online for weather data. However, you can still access and manage saved trips offline if they were previously loaded." />
             <FAQItem question="How accurate are the packing recommendations?" answer="Our recommendations are based on real-time weather data from the Open-Meteo API, covering temperature, precipitation, and wind. We also factor in trip duration to suggest appropriate clothing." />
             <FAQItem question="Can I customize the packing lists?" answer="Absolutely. You can add, remove, and edit any item. You can also adjust quantities and move items between bags using drag-and-drop." />
             <FAQItem question="Do you support different airlines?" answer="Yes! We have presets for major US and Canadian airlines, including American, Delta, Southwest, Air Canada, and WestJet. You can also set custom weight limits." />
@@ -107,7 +107,7 @@ export function Landing() {
       </section>
 
       <footer style={{ background: "var(--black)", color: "var(--white)", padding: "40px", textAlign: "center", fontSize: "13px" }}>
-        <p>Made with care for travelers everywhere. © 2026 PackRight</p>
+        <p>Made with care for travelers everywhere. © 2026 PackRite</p>
         <p style={{ marginTop: "12px", color: "rgba(255,255,255,0.6)" }}>
           Weather data provided by <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "underline" }}>Open-Meteo</a>. Geocoding via <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "underline" }}>Open-Meteo Geocoding API</a>. Always verify with your destination's official weather service and check airline policies for current baggage requirements.
         </p>

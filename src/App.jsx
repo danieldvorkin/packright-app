@@ -533,7 +533,7 @@ function BagCard({
    MAIN APP
 --------------------------------------------------------- */
 
-export default function PackRight() {
+export default function PackRite() {
   const navigate = useNavigate();
   const [view, setView] = useState("index"); // index | config | organize | select-bags | guided
 
@@ -1408,7 +1408,7 @@ export default function PackRight() {
         <div className="index-wrap">
           <div className="index-hero">
             <div className="plane-badge"><Plane size={24} /></div>
-            <h1>PackRight</h1>
+            <h1>PackRite</h1>
             <p>Your trips, your bags, packed right — every time.</p>
           </div>
 
