@@ -1,7 +1,7 @@
 import React from "react";
 import { Plane, CheckCircle, Zap, Users, ArrowRight, AlertCircle, Eye } from "lucide-react";
 
-export function Landing({ setView }) {
+export function Landing() {
   return (
     <div style={{ background: "var(--bg)", color: "var(--ink)" }}>
       <style>{`
@@ -21,14 +21,14 @@ export function Landing({ setView }) {
       `}</style>
 
       <nav style={{ background: "var(--black)", color: "var(--white)", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px" }}>
-        <button onClick={() => setView("index")} style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "20px", fontWeight: "700", textTransform: "uppercase", background: "none", border: "none", color: "var(--white)", cursor: "pointer" }}>
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "20px", fontWeight: "700", textTransform: "uppercase", textDecoration: "none", color: "var(--white)" }}>
           <Plane size={24} /> PackRight
-        </button>
+        </a>
         <div style={{ display: "flex", gap: "20px", fontSize: "14px", alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>How it works</button>
           <button onClick={() => document.getElementById("why")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>Why PackRight</button>
           <button onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>FAQ</button>
-          <button onClick={() => setView("index")} style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px" }}>Open App</button>
+          <a href="/app" style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px", textDecoration: "none", display: "inline-block" }}>Open App</a>
         </div>
       </nav>
 
@@ -38,9 +38,9 @@ export function Landing({ setView }) {
         <p style={{ fontSize: "18px", color: "rgba(255,255,255,0.8)", maxWidth: "600px", lineHeight: "1.6", marginBottom: "32px" }}>
           Your trips, your bags, packed right. Get personalized packing guides, save your favorite bag configurations, and travel with confidence.
         </p>
-        <button onClick={() => setView("index")} style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "14px 28px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: "16px", display: "inline-flex", alignItems: "center", gap: "8px" }}>
+        <a href="/app" style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "14px 28px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: "16px", display: "inline-flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
           Start Packing <ArrowRight size={20} />
-        </button>
+        </a>
       </section>
 
       <section id="why" style={{ padding: "80px 40px", maxWidth: "1200px", margin: "0 auto" }}>
