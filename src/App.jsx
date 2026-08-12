@@ -1083,7 +1083,10 @@ export default function PackRight() {
 
               {guideWeather && (
                 <div style={{ marginBottom: "24px" }}>
-                  <div className="wizard-section-label">Weather forecast</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px", marginBottom: "12px" }}>
+                    <div className="wizard-section-label" style={{ margin: 0 }}>Weather forecast</div>
+                    <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "var(--ink-soft)", textDecoration: "underline", cursor: "pointer" }}>via Open-Meteo</a>
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "12px" }}>
                     {guideWeather.daily.time.slice(0, 7).map((date, i) => (
                       <div key={date} style={{ background: "var(--white)", border: "1.5px solid var(--line)", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
@@ -1094,6 +1097,7 @@ export default function PackRight() {
                       </div>
                     ))}
                   </div>
+                  <p style={{ fontSize: "11px", color: "var(--ink-soft)", marginTop: "12px", marginBottom: 0 }}>Weather data provided by <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--ink-soft)", textDecoration: "underline", cursor: "pointer" }}>Open-Meteo</a>. Always verify with your destination's official weather service for accuracy.</p>
                 </div>
               )}
 

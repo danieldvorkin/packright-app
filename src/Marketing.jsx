@@ -108,7 +108,9 @@ export function Landing({ setView }) {
 
       <footer style={{ background: "var(--black)", color: "var(--white)", padding: "40px", textAlign: "center", fontSize: "13px" }}>
         <p>Made with care for travelers everywhere. © 2026 PackRight</p>
-        <p style={{ marginTop: "12px", color: "rgba(255,255,255,0.6)" }}>Weather data provided by Open-Meteo. Always check official airline policies for current baggage requirements.</p>
+        <p style={{ marginTop: "12px", color: "rgba(255,255,255,0.6)" }}>
+          Weather data provided by <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "underline" }}>Open-Meteo</a>. Geocoding via <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "underline" }}>Open-Meteo Geocoding API</a>. Always verify with your destination's official weather service and check airline policies for current baggage requirements.
+        </p>
       </footer>
     </div>
   );
