@@ -548,6 +548,10 @@ export default function PackRite() {
   const [quickAddSearch, setQuickAddSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [unpackedExpanded, setUnpackedExpanded] = useState(true);
+  const [tripSettingsOpen, setTripSettingsOpen] = useState(false);
+  const [settingsDest, setSettingsDest] = useState("");
+  const [settingsStartDate, setSettingsStartDate] = useState("");
+  const [settingsEndDate, setSettingsEndDate] = useState("");
   const [dragOverZone, setDragOverZone] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", category: "clothing", weight: 200, qty: 1 });
@@ -1570,7 +1574,7 @@ export default function PackRite() {
           <div style={{ minWidth: 0 }}>
             <input className="trip-input" value={tripName} onChange={(e) => setTripName(e.target.value)} />
             <div className="header-sub">
-              Packing Manifest · <button onClick={() => setView("config")}><Settings2 size={11} /> Edit bags</button>
+              Packing Manifest · <button onClick={() => { setSettingsDest(guideDestination || ""); setSettingsStartDate(guideStartDate || ""); setSettingsEndDate(guideEndDate || ""); setTripSettingsOpen(true); }}><Settings2 size={11} /> Trip Settings</button> · <button onClick={() => setView("config")}><Settings2 size={11} /> Edit bags</button>
             </div>
           </div>
         </div>
@@ -1620,6 +1624,36 @@ export default function PackRite() {
               ))}
             </div>
             <button className="trips-new-btn" onClick={startNewTrip}><Plus size={12} style={{ verticalAlign: -1 }} /> Start a new trip</button>
+          </div>
+        )}
+
+        {tripSettingsOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+            <div style={{ background: "var(--white)", borderRadius: "10px", padding: "24px", maxWidth: "500px", width: "90%", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <h2 style={{ fontSize: "18px", fontWeight: "700", textTransform: "uppercase", margin: 0 }}>Trip Settings</h2>
+                <button className="icon-btn" onClick={() => setTripSettingsOpen(false)}><X size={20} /></button>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>Destination</label>
+                <input type="text" value={settingsDest} onChange={(e) => setSettingsDest(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "38px" }} />
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>Travel dates</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <input type="date" value={settingsStartDate} onChange={(e) => setSettingsStartDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "10px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "38px" }} />
+                  <span style={{ color: "var(--ink-soft)", fontWeight: "600" }}>to</span>
+                  <input type="date" value={settingsEndDate} onChange={(e) => setSettingsEndDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "10px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "38px" }} />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
+                <button className="btn-ghost" onClick={() => setTripSettingsOpen(false)}>Cancel</button>
+                <button className="btn-primary" onClick={() => { setGuideDestination(settingsDest); setGuideStartDate(settingsStartDate); setGuideEndDate(settingsEndDate); setTripSettingsOpen(false); autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items); }}>Save Changes</button>
+              </div>
+            </div>
           </div>
         )}
       </div>
