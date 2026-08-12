@@ -2062,7 +2062,10 @@ function AppContent() {
       {/* Debug: Show trip data status */}
       {view === "organize" && (
         <div style={{ padding: "8px 24px", background: "#f0f0f0", fontSize: "11px", color: "#666", borderBottom: "1px solid #ddd" }}>
-          Trip data: dest="{guideDestination}" | start="{guideStartDate}" | end="{guideEndDate}" | weather={organizeTripWeather ? "loaded" : "null"}
+          <div>Trip: dest="{guideDestination}" | start="{guideStartDate}" | end="{guideEndDate}"</div>
+          {organizeTripWeather && (
+            <div>Weather: {organizeTripWeather.daily.time.length} total days | Times: {organizeTripWeather.daily.time.slice(0, 8).join(", ")}</div>
+          )}
         </div>
       )}
 
