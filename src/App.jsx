@@ -310,22 +310,21 @@ async function fetchWeather(lat, lon, startDate, endDate) {
     );
     if (!response.ok) {
       console.warn("Weather API returned status:", response.status);
-      return createDefaultWeather(lat, lon);
+      return createDefaultWeather(lat, lon, startDate, endDate);
     }
     const data = await response.json();
     if (!data.daily || !data.daily.time) {
       console.warn("Invalid weather response");
-      return createDefaultWeather(lat, lon);
+      return createDefaultWeather(lat, lon, startDate, endDate);
     }
     return data;
   } catch (e) {
     console.error("Weather fetch failed:", e);
-    return createDefaultWeather(lat, lon);
+    return createDefaultWeather(lat, lon, startDate, endDate);
   }
 }
 
-function createDefaultWeather(lat, lon) {
-  // Generate 7 days of reasonable defaults based on latitude (climate zones)
+function createDefaultWeather(lat, lon, startDate, endDate) {
   const temps = [];
   const codes = [];
   const precip = [];
@@ -337,8 +336,19 @@ function createDefaultWeather(lat, lon) {
   else if (Math.abs(lat) > 60) baseTemp = 5; // polar
   else if (Math.abs(lat) > 45) baseTemp = 10; // cool temperate
 
-  for (let i = 0; i < 7; i++) {
-    const date = new Date();
+  // Calculate trip duration from start/end dates
+  let numDays = 7; // default to 7 days
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    numDays = Math.max(numDays, 1);
+  }
+
+  // Generate weather for trip duration
+  const tripStart = startDate ? new Date(startDate) : new Date();
+  for (let i = 0; i < numDays; i++) {
+    const date = new Date(tripStart);
     date.setDate(date.getDate() + i);
     times.push(date.toISOString().split('T')[0]);
 
