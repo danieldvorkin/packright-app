@@ -767,7 +767,7 @@ function GlobalNavbar({ navigate, location, tripName, tripId }) {
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { tripId } = useParams();
+  const { id: tripId } = useParams();
 
   let view = "index"; // default
   if (location.pathname === "/app/new") view = "guided";
