@@ -1698,14 +1698,18 @@ function AppContent() {
                     <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "var(--ink-soft)", textDecoration: "underline", cursor: "pointer" }}>via Open-Meteo</a>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "12px" }}>
-                    {guideWeather.daily.time.slice(0, 7).map((date, i) => (
+                    {guideWeather.daily.time.slice(0, 7).map((date, i) => {
+                      const [year, month, day] = date.split('-').map(Number);
+                      const dateObj = new Date(year, month - 1, day);
+                      return (
                       <div key={date} style={{ background: "var(--white)", border: "1.5px solid var(--line)", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
-                        <div style={{ fontSize: "11px", color: "var(--ink-soft)", marginBottom: "6px" }}>{new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                        <div style={{ fontSize: "11px", color: "var(--ink-soft)", marginBottom: "6px" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
                         <Thermometer size={16} style={{ color: "var(--ink-soft)", margin: "6px auto" }} />
                         <div style={{ fontSize: "14px", fontWeight: "600" }}>{Math.round(guideWeather.daily.temperature_2m_max[i])}°</div>
                         <div style={{ fontSize: "11px", color: "var(--ink-soft)" }}>{Math.round(guideWeather.daily.temperature_2m_min[i])}°</div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <p style={{ fontSize: "11px", color: "var(--ink-soft)", marginTop: "12px", marginBottom: 0 }}>Weather data provided by <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--ink-soft)", textDecoration: "underline", cursor: "pointer" }}>Open-Meteo</a>. Always verify with your destination's official weather service for accuracy.</p>
                 </div>
@@ -2113,12 +2117,13 @@ function AppContent() {
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100px, 100%), 1fr))", gap: "8px", marginBottom: "16px" }}>
                     {organizeTripWeather.daily.time.map((date, i) => {
-                      const dateObj = new Date(date);
-                      const startObj = new Date(guideStartDate);
-                      const endObj = new Date(guideEndDate);
-                      if (dateObj < startObj || dateObj > endObj) return null;
+                      // Compare dates as strings to avoid timezone issues
+                      if (date < guideStartDate || date > guideEndDate) return null;
 
                       const weatherInfo = getWeatherDescription(organizeTripWeather.daily.weather_code[i]);
+                      // Parse date string safely without timezone conversion
+                      const [year, month, day] = date.split('-').map(Number);
+                      const dateObj = new Date(year, month - 1, day);
                       return (
                         <div key={date} style={{ background: "var(--white)", border: "2px solid", borderColor: weatherInfo.color, borderRadius: "6px", padding: "8px", textAlign: "center" }}>
                           <div style={{ fontSize: "9px", color: "var(--ink-soft)", marginBottom: "3px", fontWeight: "600" }}>{dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
