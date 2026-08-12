@@ -192,6 +192,92 @@ let uid = 1;
 const nextId = () => `item-${uid++}`;
 const STORAGE_KEY = "packright:trips";
 const SAVED_BAGS_KEY = "packright:saved-bags";
+const DB_NAME = "PackrightDB";
+const DB_VERSION = 1;
+
+let db = null;
+
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+    request.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains("trips")) {
+        database.createObjectStore("trips", { keyPath: "id" });
+      }
+      if (!database.objectStoreNames.contains("bags")) {
+        database.createObjectStore("bags", { keyPath: "id" });
+      }
+    };
+  });
+}
+
+async function saveToStorage(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn("localStorage quota exceeded, using IndexedDB:", e);
+  }
+
+  if (db) {
+    try {
+      const storeName = key === STORAGE_KEY ? "trips" : "bags";
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      await new Promise((resolve, reject) => {
+        const clearRequest = store.clear();
+        clearRequest.onsuccess = () => {
+          data.forEach((item) => {
+            store.put(item);
+          });
+          resolve();
+        };
+        clearRequest.onerror = () => reject(clearRequest.error);
+      });
+    } catch (e) {
+      console.error("IndexedDB save failed:", e);
+    }
+  }
+}
+
+async function loadFromStorage(key) {
+  let data = null;
+
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      data = JSON.parse(raw);
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (e) {
+    console.warn("localStorage load failed:", e);
+  }
+
+  if (db && !data) {
+    try {
+      const storeName = key === STORAGE_KEY ? "trips" : "bags";
+      const tx = db.transaction(storeName, "readonly");
+      const store = tx.objectStore(storeName);
+      return new Promise((resolve, reject) => {
+        const getAllRequest = store.getAll();
+        getAllRequest.onsuccess = () => {
+          resolve(getAllRequest.result || []);
+        };
+        getAllRequest.onerror = () => reject(getAllRequest.error);
+      });
+    } catch (e) {
+      console.error("IndexedDB load failed:", e);
+      return [];
+    }
+  }
+
+  return data || [];
+}
 
 /* ---------------------------------------------------------
    HELPERS
@@ -491,27 +577,37 @@ export default function PackRight() {
   const [guideLoadingWeather, setGuideLoadingWeather] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const list = raw ? JSON.parse(raw) : [];
-      setSavedTrips(Array.isArray(list) ? list : []);
-    } catch (e) {
-      setSavedTrips([]);
-    } finally {
-      setTripsLoading(false);
-    }
+    (async () => {
+      try {
+        await initDB();
+      } catch (e) {
+        console.warn("IndexedDB init failed:", e);
+      }
+
+      try {
+        const list = await loadFromStorage(STORAGE_KEY);
+        setSavedTrips(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error("Failed to load trips:", e);
+        setSavedTrips([]);
+      } finally {
+        setTripsLoading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SAVED_BAGS_KEY);
-      const list = raw ? JSON.parse(raw) : [];
-      setSavedBags(Array.isArray(list) ? list : []);
-    } catch (e) {
-      setSavedBags([]);
-    } finally {
-      setBagsLoading(false);
-    }
+    (async () => {
+      try {
+        const list = await loadFromStorage(SAVED_BAGS_KEY);
+        setSavedBags(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error("Failed to load bags:", e);
+        setSavedBags([]);
+      } finally {
+        setBagsLoading(false);
+      }
+    })();
   }, []);
 
   /* ---- derived ---- */
@@ -623,10 +719,11 @@ export default function PackRight() {
 
   const persistTrips = async (list) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      await saveToStorage(STORAGE_KEY, list);
       setSavedTrips(list);
       return true;
     } catch (e) {
+      console.error("Failed to persist trips:", e);
       setTripsError("Couldn't save right now — your browser storage may be full or blocked.");
       return false;
     }
@@ -671,10 +768,11 @@ export default function PackRight() {
 
   const persistSavedBags = async (list) => {
     try {
-      localStorage.setItem(SAVED_BAGS_KEY, JSON.stringify(list));
+      await saveToStorage(SAVED_BAGS_KEY, list);
       setSavedBags(list);
       return true;
     } catch (e) {
+      console.error("Failed to persist bags:", e);
       return false;
     }
   };
