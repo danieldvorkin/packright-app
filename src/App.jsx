@@ -1128,7 +1128,7 @@ export default function PackRight() {
   --------------------------------------------------------- */
 
   if (view === "landing") {
-    return <Landing />;
+    return <Landing setView={setView} />;
   }
 
   /* ---------------------------------------------------------

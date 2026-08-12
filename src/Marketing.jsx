@@ -1,7 +1,7 @@
 import React from "react";
 import { Plane, CheckCircle, Zap, Users, ArrowRight, AlertCircle, Eye } from "lucide-react";
 
-export function Landing() {
+export function Landing({ setView }) {
   return (
     <div style={{ background: "var(--bg)", color: "var(--ink)" }}>
       <style>{`
@@ -17,17 +17,18 @@ export function Landing() {
         * { box-sizing: border-box; }
         body { margin: 0; font-family: 'Inter', system-ui, sans-serif; }
         h1, h2, h3 { font-family: 'Oswald', 'Arial Narrow', sans-serif; margin: 0; }
+        a { cursor: pointer; }
       `}</style>
 
-      <nav style={{ background: "var(--black)", color: "var(--white)", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "20px", fontWeight: "700", textTransform: "uppercase" }}>
+      <nav style={{ background: "var(--black)", color: "var(--white)", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px" }}>
+        <button onClick={() => setView("index")} style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "20px", fontWeight: "700", textTransform: "uppercase", background: "none", border: "none", color: "var(--white)", cursor: "pointer" }}>
           <Plane size={24} /> PackRight
-        </div>
-        <div style={{ display: "flex", gap: "24px", fontSize: "14px" }}>
-          <a href="#how-it-works" style={{ color: "var(--white)", textDecoration: "none" }}>How it works</a>
-          <a href="#why" style={{ color: "var(--white)", textDecoration: "none" }}>Why PackRight</a>
-          <a href="#faq" style={{ color: "var(--white)", textDecoration: "none" }}>FAQ</a>
-          <button onClick={() => window.location.href = "/"} style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "600" }}>Open App</button>
+        </button>
+        <div style={{ display: "flex", gap: "20px", fontSize: "14px", alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>How it works</button>
+          <button onClick={() => document.getElementById("why")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>Why PackRight</button>
+          <button onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })} style={{ background: "none", border: "none", color: "var(--white)", cursor: "pointer", fontSize: "14px" }}>FAQ</button>
+          <button onClick={() => setView("index")} style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px" }}>Open App</button>
         </div>
       </nav>
 
@@ -37,7 +38,7 @@ export function Landing() {
         <p style={{ fontSize: "18px", color: "rgba(255,255,255,0.8)", maxWidth: "600px", lineHeight: "1.6", marginBottom: "32px" }}>
           Your trips, your bags, packed right. Get personalized packing guides, save your favorite bag configurations, and travel with confidence.
         </p>
-        <button onClick={() => window.location.href = "/"} style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "14px 28px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: "16px", display: "inline-flex", alignItems: "center", gap: "8px" }}>
+        <button onClick={() => setView("index")} style={{ background: "var(--white)", color: "var(--black)", border: "none", padding: "14px 28px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: "16px", display: "inline-flex", alignItems: "center", gap: "8px" }}>
           Start Packing <ArrowRight size={20} />
         </button>
       </section>
