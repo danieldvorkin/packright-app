@@ -2,8 +2,9 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plane, Briefcase, Package, Shirt, Footprints, Sparkles, Laptop, FileText, Watch,
   Plus, X, Search, GripVertical, Info, ChevronDown, ChevronLeft, Scale, AlertTriangle,
-  Trash2, PackageCheck, Save, FolderOpen, Check, Clock, ArrowRightLeft, Settings2, Home
+  Trash2, PackageCheck, Save, FolderOpen, Check, Clock, ArrowRightLeft, Settings2, Home, Cloud, Thermometer, Zap
 } from "lucide-react";
+import { Landing } from "./Marketing";
 
 /* ---------------------------------------------------------
    DATA
@@ -93,6 +94,7 @@ const AIRLINE_PRESETS = {
 let uid = 1;
 const nextId = () => `item-${uid++}`;
 const STORAGE_KEY = "packright:trips";
+const SAVED_BAGS_KEY = "packright:saved-bags";
 
 /* ---------------------------------------------------------
    HELPERS
@@ -116,6 +118,70 @@ function freshBagsFromPreset(key) {
   return preset.bags.map((b) => ({
     id: `bag-${nextId()}`, name: b.name, limit: b.limit, parentId: null, type: b.type,
   }));
+}
+
+async function fetchWeather(lat, lon) {
+  try {
+    const response = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7`
+    );
+    const data = await response.json();
+    return data;
+  } catch (e) {
+    console.error("Weather fetch failed:", e);
+    return null;
+  }
+}
+
+function getPackingRecommendations(weatherData) {
+  if (!weatherData) return [];
+
+  const dailyData = weatherData.daily;
+  const tempMax = Math.max(...dailyData.temperature_2m_max);
+  const tempMin = Math.min(...dailyData.temperature_2m_min);
+  const hasRain = dailyData.precipitation_sum.some((p) => p > 0.1);
+
+  const recommendations = [];
+
+  if (tempMax > 25) {
+    recommendations.push({ name: "Shorts", category: "clothing" });
+    recommendations.push({ name: "T-shirt", category: "clothing" });
+    recommendations.push({ name: "Sandals", category: "footwear" });
+    recommendations.push({ name: "Sun hat", category: "accessories" });
+    recommendations.push({ name: "Sunglasses", category: "accessories" });
+  } else if (tempMax > 15) {
+    recommendations.push({ name: "Jeans", category: "clothing" });
+    recommendations.push({ name: "T-shirt", category: "clothing" });
+    recommendations.push({ name: "Sweater", category: "clothing" });
+    recommendations.push({ name: "Sneakers", category: "footwear" });
+  } else {
+    recommendations.push({ name: "Jeans", category: "clothing" });
+    recommendations.push({ name: "Sweater", category: "clothing" });
+    recommendations.push({ name: "Dress shoes", category: "footwear" });
+  }
+
+  if (hasRain) {
+    recommendations.push({ name: "Rain jacket", category: "clothing" });
+  }
+
+  return recommendations;
+}
+
+async function geocodeDestination(destination) {
+  try {
+    const response = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=en&format=json`
+    );
+    const data = await response.json();
+    if (data.results && data.results.length > 0) {
+      const result = data.results[0];
+      return { lat: result.latitude, lon: result.longitude };
+    }
+    return null;
+  } catch (e) {
+    console.error("Geocoding failed:", e);
+    return null;
+  }
 }
 
 /* ---------------------------------------------------------
@@ -285,7 +351,7 @@ function BagCard({
 --------------------------------------------------------- */
 
 export default function PackRight() {
-  const [view, setView] = useState("index"); // index | config | organize
+  const [view, setView] = useState("landing"); // landing | index | config | organize | select-bags | guided
 
   const [tripName, setTripName] = useState("New trip");
   const [unit, setUnit] = useState("kg");
@@ -307,6 +373,22 @@ export default function PackRight() {
   const [saveStatus, setSaveStatus] = useState("idle");
   const [tripsError, setTripsError] = useState(null);
 
+  const [savedBags, setSavedBags] = useState([]);
+  const [bagsLoading, setBagsLoading] = useState(true);
+  const [bagNameInput, setBagNameInput] = useState("");
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  const [guidedStep, setGuidedStep] = useState("name"); // name | dates | destination | review
+  const [guideStartDate, setGuideStartDate] = useState("");
+  const [guideEndDate, setGuideEndDate] = useState("");
+  const [guideDestination, setGuideDestination] = useState("");
+  const [guideLat, setGuideLat] = useState(null);
+  const [guideLon, setGuideLon] = useState(null);
+  const [guideWeather, setGuideWeather] = useState(null);
+  const [guideRecommendations, setGuideRecommendations] = useState([]);
+  const [guideLoadingWeather, setGuideLoadingWeather] = useState(false);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -316,6 +398,18 @@ export default function PackRight() {
       setSavedTrips([]);
     } finally {
       setTripsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_BAGS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      setSavedBags(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setSavedBags([]);
+    } finally {
+      setBagsLoading(false);
     }
   }, []);
 
@@ -401,7 +495,18 @@ export default function PackRight() {
     setItems([]);
     setCurrentTripId(null);
     setTripsPanelOpen(false);
-    setView("config");
+    setBagNameInput("");
+    setSaveMessage("");
+    setSaveAsOpen(false);
+    setGuidedStep("name");
+    setGuideStartDate("");
+    setGuideEndDate("");
+    setGuideDestination("");
+    setGuideLat(null);
+    setGuideLon(null);
+    setGuideWeather(null);
+    setGuideRecommendations([]);
+    setView("guided");
   };
 
   const persistTrips = async (list) => {
@@ -450,6 +555,34 @@ export default function PackRight() {
   const fmtDate = (iso) => {
     try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); }
     catch { return ""; }
+  };
+
+  const persistSavedBags = async (list) => {
+    try {
+      localStorage.setItem(SAVED_BAGS_KEY, JSON.stringify(list));
+      setSavedBags(list);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const saveBagConfiguration = async (name) => {
+    if (!name.trim()) return false;
+    const record = { id: `bagset-${Date.now()}`, name: name.trim(), bags, savedAt: new Date().toISOString() };
+    const nextList = [record, ...savedBags];
+    return await persistSavedBags(nextList);
+  };
+
+  const deleteSavedBags = async (id) => {
+    const nextList = savedBags.filter((b) => b.id !== id);
+    await persistSavedBags(nextList);
+  };
+
+  const loadSavedBagConfiguration = (bagSet) => {
+    bumpUidFromIds(bagSet.bags.map((b) => b.id));
+    setBags(bagSet.bags);
+    setView("config");
   };
 
   /* ---------------------------------------------------------
@@ -742,8 +875,261 @@ export default function PackRight() {
       .wizard-cta:hover { background: var(--black-2); }
       .wizard-cta:active { transform: translateY(1px); }
       @media (min-width: 480px) { .wizard-cta { width: auto; } }
+
+      /* ---- bag select cards ---- */
+      .bags-select-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-bottom: 24px; }
+      .bag-select-card { border: 1.5px solid var(--line); background: var(--white); border-radius: 8px; padding: 14px; box-shadow: 0 2px 0 var(--line); }
+      .bag-select-card:hover { border-color: var(--ink-faint); box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+      .bag-select-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+      .bag-select-top h3 { font-size: 14px; margin: 0; font-weight: 600; text-transform: uppercase; flex: 1; min-width: 0; overflow-wrap: break-word; }
+      .bag-select-meta { font-size: 11px; color: var(--ink-soft); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
     `}</style>
   );
+
+  /* ---------------------------------------------------------
+     SELECT BAGS VIEW
+  --------------------------------------------------------- */
+
+  if (view === "select-bags") {
+    const handleSaveAsTemplate = async () => {
+      if (!bagNameInput.trim()) return;
+      const ok = await saveBagConfiguration(bagNameInput);
+      if (ok) {
+        setSaveMessage("✓ Bag configuration saved!");
+        setBagNameInput("");
+        setSaveAsOpen(false);
+        setTimeout(() => setSaveMessage(""), 2000);
+      }
+    };
+
+    return (
+      <div className="app">
+        <GlobalStyle />
+        <div className="wizard-wrap">
+          <button className="wizard-back" onClick={() => setView("index")}>
+            <ChevronLeft size={15} /> Back to trips
+          </button>
+          <h1 className="wizard-title">Your Packing Blueprints</h1>
+          <p className="wizard-sub">Start by selecting a saved bag configuration or create a new one from scratch. You can always adjust your bags before packing.</p>
+
+          <div className="wizard-section-label">Saved Configurations</div>
+          {bagsLoading && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>Loading saved bags…</div>}
+          {!bagsLoading && savedBags.length === 0 && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>No saved bag configurations yet. Create one below!</div>}
+          {!bagsLoading && savedBags.length > 0 && (
+            <div className="bags-select-grid">
+              {savedBags.map((bagSet) => (
+                <div key={bagSet.id} className="bag-select-card">
+                  <div className="bag-select-top">
+                    <h3>{bagSet.name}</h3>
+                    <button className="icon-btn" onClick={() => deleteSavedBags(bagSet.id)} title="Delete" aria-label="Delete"><X size={15} /></button>
+                  </div>
+                  <div className="bag-select-meta">
+                    <Clock size={11} /> {fmtDate(bagSet.savedAt)}
+                    <span style={{ marginLeft: "8px" }}>· {bagSet.bags.filter((b) => !b.parentId).length} bags</span>
+                  </div>
+                  <button className="btn-primary" style={{ width: "100%", marginTop: "12px" }} onClick={() => loadSavedBagConfiguration(bagSet)}>
+                    Use this setup
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="wizard-section-label" style={{ marginTop: "28px" }}>Start Fresh</div>
+          <div className="airline-grid">
+            {Object.entries(AIRLINE_PRESETS).map(([key, p]) => (
+              <button key={key} className={`airline-card ${airlineKey === key ? "active" : ""}`} onClick={() => { setAirlineKey(key); applyAirlinePreset(key); setView("config"); }}>
+                <div className="airline-card-name">{p.label}</div>
+                <div className="airline-card-sub">Checked bag: 50 lb / 23 kg</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------
+     GUIDED PACKING EXPERIENCE
+  --------------------------------------------------------- */
+
+  if (view === "guided") {
+    const handleGuidedNext = async () => {
+      if (guidedStep === "name") {
+        if (!tripName.trim()) return;
+        setGuidedStep("dates");
+      } else if (guidedStep === "dates") {
+        if (!guideStartDate || !guideEndDate) return;
+        setGuidedStep("destination");
+      } else if (guidedStep === "destination") {
+        if (!guideDestination.trim()) return;
+        setGuidedStep("loading");
+        setGuideLoadingWeather(true);
+        const coords = await geocodeDestination(guideDestination);
+        if (coords) {
+          setGuideLat(coords.lat);
+          setGuideLon(coords.lon);
+          const weather = await fetchWeather(coords.lat, coords.lon);
+          setGuideWeather(weather);
+          if (weather) {
+            const recs = getPackingRecommendations(weather);
+            setGuideRecommendations(recs);
+          }
+        }
+        setGuideLoadingWeather(false);
+        setGuidedStep("review");
+      } else if (guidedStep === "review") {
+        setView("select-bags");
+      }
+    };
+
+    const handleGuidedBack = () => {
+      if (guidedStep === "dates") setGuidedStep("name");
+      else if (guidedStep === "destination") setGuidedStep("dates");
+      else if (guidedStep === "review") setGuidedStep("destination");
+      else setView("index");
+    };
+
+    return (
+      <div className="app">
+        <GlobalStyle />
+        <div className="wizard-wrap">
+          <button className="wizard-back" onClick={handleGuidedBack}>
+            <ChevronLeft size={15} /> {guidedStep === "name" ? "Back to trips" : "Back"}
+          </button>
+
+          {guidedStep === "name" && (
+            <>
+              <h1 className="wizard-title">Where are you going?</h1>
+              <p className="wizard-sub">Let's plan your perfect trip. Start by naming your journey.</p>
+              <input
+                className="wizard-tripname"
+                value={tripName}
+                onChange={(e) => setTripName(e.target.value)}
+                placeholder="e.g., Paris Spring Break, Beach Weekend"
+                autoFocus
+              />
+              <div style={{ marginTop: "32px" }}>
+                <button className="wizard-cta" onClick={handleGuidedNext} disabled={!tripName.trim()}>
+                  Continue <ArrowRightLeft size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {guidedStep === "dates" && (
+            <>
+              <h1 className="wizard-title">When are you traveling?</h1>
+              <p className="wizard-sub">Knowing your travel dates helps us recommend the right clothes for the weather.</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "20px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>Start date</label>
+                  <input type="date" value={guideStartDate} onChange={(e) => setGuideStartDate(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>End date</label>
+                  <input type="date" value={guideEndDate} onChange={(e) => setGuideEndDate(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px" }} />
+                </div>
+              </div>
+              <div style={{ marginTop: "28px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button className="btn-ghost" onClick={handleGuidedBack}>Back</button>
+                <button className="wizard-cta" onClick={handleGuidedNext} disabled={!guideStartDate || !guideEndDate}>
+                  Continue <ArrowRightLeft size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {guidedStep === "destination" && (
+            <>
+              <h1 className="wizard-title">Where exactly?</h1>
+              <p className="wizard-sub">Tell us your destination so we can check the weather forecast and recommend appropriate clothing.</p>
+              <input
+                type="text"
+                placeholder="City, country (e.g., Barcelona, Spain)"
+                value={guideDestination}
+                onChange={(e) => setGuideDestination(e.target.value)}
+                style={{ width: "100%", borderRadius: "6px", padding: "12px 14px", fontSize: "14px", border: "1.5px solid var(--line)", marginTop: "20px", minHeight: "40px" }}
+                autoFocus
+              />
+              <div style={{ marginTop: "28px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button className="btn-ghost" onClick={handleGuidedBack}>Back</button>
+                <button className="wizard-cta" onClick={handleGuidedNext} disabled={!guideDestination.trim()}>
+                  Check weather <Cloud size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {guidedStep === "review" && (
+            <>
+              <h1 className="wizard-title">Your Trip at a Glance</h1>
+              <p className="wizard-sub">Based on the weather forecast, here are items we recommend packing.</p>
+
+              <div style={{ background: "var(--bg-soft)", borderRadius: "8px", padding: "20px", marginTop: "24px", marginBottom: "24px" }}>
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "4px" }}>Trip</div>
+                  <div style={{ fontSize: "18px", fontWeight: "600" }}>{tripName}</div>
+                </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "4px" }}>Destination</div>
+                  <div style={{ fontSize: "16px", fontWeight: "500" }}>{guideDestination}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "4px" }}>Duration</div>
+                  <div style={{ fontSize: "14px" }}>{guideStartDate} to {guideEndDate}</div>
+                </div>
+              </div>
+
+              {guideWeather && (
+                <div style={{ marginBottom: "24px" }}>
+                  <div className="wizard-section-label">Weather forecast</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "12px" }}>
+                    {guideWeather.daily.time.slice(0, 7).map((date, i) => (
+                      <div key={date} style={{ background: "var(--white)", border: "1.5px solid var(--line)", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
+                        <div style={{ fontSize: "11px", color: "var(--ink-soft)", marginBottom: "6px" }}>{new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                        <Thermometer size={16} style={{ color: "var(--ink-soft)", margin: "6px auto" }} />
+                        <div style={{ fontSize: "14px", fontWeight: "600" }}>{Math.round(guideWeather.daily.temperature_2m_max[i])}°</div>
+                        <div style={{ fontSize: "11px", color: "var(--ink-soft)" }}>{Math.round(guideWeather.daily.temperature_2m_min[i])}°</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {guideRecommendations.length > 0 && (
+                <div style={{ marginBottom: "24px" }}>
+                  <div className="wizard-section-label">Recommended items</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {guideRecommendations.map((item) => (
+                      <span key={item.name} style={{ background: "var(--black)", color: "var(--white)", padding: "6px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "500" }}>
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: "28px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <button className="btn-ghost" onClick={handleGuidedBack}>Back</button>
+                <button className="wizard-cta" onClick={handleGuidedNext}>
+                  Let's Pack <ArrowRightLeft size={15} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------
+     LANDING PAGE
+  --------------------------------------------------------- */
+
+  if (view === "landing") {
+    return <Landing />;
+  }
 
   /* ---------------------------------------------------------
      INDEX VIEW
@@ -758,6 +1144,9 @@ export default function PackRight() {
             <div className="plane-badge"><Plane size={24} /></div>
             <h1>PackRight</h1>
             <p>Your trips, your bags, packed right — every time.</p>
+            <div style={{ marginTop: "24px" }}>
+              <button className="btn-primary" onClick={() => setView("landing")} style={{ marginRight: "8px" }}>Learn More</button>
+            </div>
           </div>
 
           <div className="index-grid">
@@ -804,15 +1193,45 @@ export default function PackRight() {
   --------------------------------------------------------- */
 
   if (view === "config") {
+    const handleSaveAsTemplate = async () => {
+      if (!bagNameInput.trim()) return;
+      const ok = await saveBagConfiguration(bagNameInput);
+      if (ok) {
+        setSaveMessage("✓ Bag configuration saved!");
+        setBagNameInput("");
+        setSaveAsOpen(false);
+        setTimeout(() => setSaveMessage(""), 2000);
+      }
+    };
+
     return (
       <div className="app">
         <GlobalStyle />
         <div className="wizard-wrap">
-          <button className="wizard-back" onClick={() => setView(currentTripId ? "organize" : "index")}>
-            <ChevronLeft size={15} /> {currentTripId ? "Back to packing" : "Back to trips"}
+          <button className="wizard-back" onClick={() => setView(currentTripId ? "organize" : "select-bags")}>
+            <ChevronLeft size={15} /> {currentTripId ? "Back to packing" : "Back"}
           </button>
           <h1 className="wizard-title">Set up your bags</h1>
           <p className="wizard-sub">Pick your airline to load current baggage limits, then adjust anything to fit your actual bags. You can add pouches — like a dopp kit or cables pouch — inside any bag.</p>
+
+          {saveMessage && <div style={{ background: "var(--black)", color: "var(--white)", padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", textAlign: "center" }}>{saveMessage}</div>}
+          {saveAsOpen && (
+            <div style={{ background: "var(--bg-soft)", border: "1.5px solid var(--line)", borderRadius: "8px", padding: "14px", marginBottom: "16px" }}>
+              <p style={{ fontSize: "12px", color: "var(--ink-soft)", marginBottom: "10px", marginTop: 0 }}>Save this configuration as a template for future trips</p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  placeholder="e.g., Weekend getaway, Beach trip"
+                  value={bagNameInput}
+                  onChange={(e) => setBagNameInput(e.target.value)}
+                  style={{ flex: 1, borderRadius: "5px", padding: "8px 10px", fontSize: "12.5px" }}
+                />
+                <button className="btn-primary" onClick={handleSaveAsTemplate}>Save</button>
+                <button className="btn-ghost" onClick={() => { setSaveAsOpen(false); setBagNameInput(""); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {!saveAsOpen && <button className="btn-ghost" style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => setSaveAsOpen(true)}><Save size={13} /> Save this setup as template</button>}
 
           <input className="wizard-tripname" value={tripName} onChange={(e) => setTripName(e.target.value)} placeholder="Name this trip" />
 
