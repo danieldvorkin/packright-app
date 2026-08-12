@@ -1872,8 +1872,8 @@ function AppContent() {
      ORGANIZE VIEW (drag & drop packing)
   --------------------------------------------------------- */
 
-  // If loading trip data while on organize view, show loading state
-  if (view === "organize" && tripsLoading) {
+  // If on organize view but trip data hasn't loaded yet, show loading state
+  if (view === "organize" && tripId && currentTripId !== tripId) {
     return (
       <div className="app">
         <GlobalStyle />
@@ -1885,24 +1885,6 @@ function AppContent() {
         </div>
       </div>
     );
-  }
-
-  // If trip not found in savedTrips, redirect to index
-  if (view === "organize" && tripId && !tripsLoading && currentTripId !== tripId) {
-    const trip = savedTrips.find((t) => t.id === tripId);
-    if (!trip) {
-      return (
-        <div className="app">
-          <GlobalStyle />
-          <GlobalNavbar navigate={navigate} location={location} tripName="" tripId={null} />
-          <div style={{ marginTop: "53px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px" }}>
-            <div style={{ textAlign: "center", color: "var(--ink-soft)" }}>
-              <div style={{ fontSize: "14px", marginBottom: "16px" }}>Trip not found. Redirecting…</div>
-            </div>
-          </div>
-        </div>
-      );
-    }
   }
 
   return (
