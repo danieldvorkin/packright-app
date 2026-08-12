@@ -1093,6 +1093,10 @@ export default function PackRight() {
                 </div>
               </div>
 
+              {guideLoadingWeather && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>Fetching weather data…</div>}
+
+              {!guideLoadingWeather && !guideWeather && <div style={{ textAlign: "center", color: "var(--ink-soft)", padding: "20px", fontSize: 13 }}>Unable to load weather data. Try a different destination or continue without recommendations.</div>}
+
               {guideWeather && (
                 <div style={{ marginBottom: "24px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px", marginBottom: "12px" }}>
