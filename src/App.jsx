@@ -549,9 +549,13 @@ export default function PackRite() {
   const [activeCat, setActiveCat] = useState("all");
   const [unpackedExpanded, setUnpackedExpanded] = useState(true);
   const [tripSettingsOpen, setTripSettingsOpen] = useState(false);
+  const [settingsTripName, setSettingsTripName] = useState("");
   const [settingsDest, setSettingsDest] = useState("");
+  const [settingsDestSuggestions, setSettingsDestSuggestions] = useState([]);
   const [settingsStartDate, setSettingsStartDate] = useState("");
   const [settingsEndDate, setSettingsEndDate] = useState("");
+  const [settingsUnit, setSettingsUnit] = useState("kg");
+  const [settingsAirline, setSettingsAirline] = useState("us_major");
   const [dragOverZone, setDragOverZone] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", category: "clothing", weight: 200, qty: 1 });
@@ -1574,7 +1578,7 @@ export default function PackRite() {
           <div style={{ minWidth: 0 }}>
             <input className="trip-input" value={tripName} onChange={(e) => setTripName(e.target.value)} />
             <div className="header-sub">
-              Packing Manifest · <button onClick={() => { setSettingsDest(guideDestination || ""); setSettingsStartDate(guideStartDate || ""); setSettingsEndDate(guideEndDate || ""); setTripSettingsOpen(true); }}><Settings2 size={11} /> Trip Settings</button> · <button onClick={() => setView("config")}><Settings2 size={11} /> Edit bags</button>
+              Packing Manifest · <button onClick={() => { setSettingsTripName(tripName); setSettingsDest(guideDestination || ""); setSettingsStartDate(guideStartDate || ""); setSettingsEndDate(guideEndDate || ""); setSettingsUnit(unit); setSettingsAirline(airlineKey); setTripSettingsOpen(true); }}><Settings2 size={11} /> Trip Settings</button> · <button onClick={() => setView("config")}><Settings2 size={11} /> Edit bags</button>
             </div>
           </div>
         </div>
@@ -1628,30 +1632,87 @@ export default function PackRite() {
         )}
 
         {tripSettingsOpen && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-            <div style={{ background: "var(--white)", borderRadius: "10px", padding: "24px", maxWidth: "500px", width: "90%", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "18px", fontWeight: "700", textTransform: "uppercase", margin: 0 }}>Trip Settings</h2>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, overflow: "auto" }}>
+            <div style={{ background: "var(--white)", borderRadius: "10px", padding: "40px", maxWidth: "700px", width: "90%", maxHeight: "90vh", overflow: "auto", margin: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
+                <h1 style={{ fontSize: "22px", fontWeight: "700", textTransform: "uppercase", margin: 0 }}>Trip Settings</h1>
                 <button className="icon-btn" onClick={() => setTripSettingsOpen(false)}><X size={20} /></button>
               </div>
 
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>Destination</label>
-                <input type="text" value={settingsDest} onChange={(e) => setSettingsDest(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "38px" }} />
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>Trip name</label>
+                <input type="text" value={settingsTripName} onChange={(e) => setSettingsTripName(e.target.value)} placeholder="e.g., Paris Spring Break" style={{ width: "100%", borderRadius: "6px", padding: "12px 14px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "40px" }} />
               </div>
 
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "6px" }}>Travel dates</label>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <input type="date" value={settingsStartDate} onChange={(e) => setSettingsStartDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "10px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "38px" }} />
-                  <span style={{ color: "var(--ink-soft)", fontWeight: "600" }}>to</span>
-                  <input type="date" value={settingsEndDate} onChange={(e) => setSettingsEndDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "10px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "38px" }} />
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>Destination</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    placeholder="City, country"
+                    value={settingsDest}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      setSettingsDest(val);
+                      if (val.length > 2) {
+                        const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(val)}&count=5&language=en&format=json`);
+                        const data = await response.json();
+                        setSettingsDestSuggestions(data.results || []);
+                      } else {
+                        setSettingsDestSuggestions([]);
+                      }
+                    }}
+                    style={{ width: "100%", borderRadius: "6px", padding: "12px 14px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "40px" }}
+                  />
+                  {settingsDestSuggestions.length > 0 && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--white)", border: "1.5px solid var(--line)", borderTop: "none", borderRadius: "0 0 6px 6px", maxHeight: "200px", overflowY: "auto", zIndex: 10 }}>
+                      {settingsDestSuggestions.map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSettingsDest(`${suggestion.name}${suggestion.country ? ", " + suggestion.country : ""}`);
+                            setSettingsDestSuggestions([]);
+                          }}
+                          style={{ width: "100%", textAlign: "left", padding: "12px 14px", border: "none", background: "none", cursor: "pointer", fontSize: "14px", borderBottom: idx < settingsDestSuggestions.length - 1 ? "1px solid var(--line)" : "none" }}
+                        >
+                          <div style={{ fontWeight: "500" }}>{suggestion.name}</div>
+                          <div style={{ fontSize: "12px", color: "var(--ink-soft)" }}>{suggestion.admin1 && suggestion.admin1}{suggestion.country ? (suggestion.admin1 ? ", " : "") + suggestion.country : ""}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>Travel dates</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <input type="date" value={settingsStartDate} onChange={(e) => setSettingsStartDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "12px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "40px" }} />
+                  <span style={{ color: "var(--ink-soft)", fontWeight: "600" }}>to</span>
+                  <input type="date" value={settingsEndDate} onChange={(e) => setSettingsEndDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "12px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "40px" }} />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>Weight unit</label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setSettingsUnit("kg")} style={{ flex: 1, padding: "10px", border: settingsUnit === "kg" ? "1.5px solid var(--black)" : "1.5px solid var(--line)", background: settingsUnit === "kg" ? "var(--black)" : "var(--white)", color: settingsUnit === "kg" ? "var(--white)" : "var(--ink)", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px" }}>Kilograms (kg)</button>
+                  <button onClick={() => setSettingsUnit("lb")} style={{ flex: 1, padding: "10px", border: settingsUnit === "lb" ? "1.5px solid var(--black)" : "1.5px solid var(--line)", background: settingsUnit === "lb" ? "var(--black)" : "var(--white)", color: settingsUnit === "lb" ? "var(--white)" : "var(--ink)", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px" }}>Pounds (lb)</button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "28px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>Airline</label>
+                <select value={settingsAirline} onChange={(e) => setSettingsAirline(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "12px 14px", fontSize: "14px", border: "1.5px solid var(--line)", minHeight: "40px" }}>
+                  {Object.entries(AIRLINE_PRESETS).map(([key, p]) => (
+                    <option key={key} value={key}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
                 <button className="btn-ghost" onClick={() => setTripSettingsOpen(false)}>Cancel</button>
-                <button className="btn-primary" onClick={() => { setGuideDestination(settingsDest); setGuideStartDate(settingsStartDate); setGuideEndDate(settingsEndDate); setTripSettingsOpen(false); autoSaveTrip(currentTripId, tripName, unit, airlineKey, bags, items); }}>Save Changes</button>
+                <button className="btn-primary" onClick={() => { setTripName(settingsTripName); setGuideDestination(settingsDest); setGuideStartDate(settingsStartDate); setGuideEndDate(settingsEndDate); setUnit(settingsUnit); setAirlineKey(settingsAirline); setTripSettingsOpen(false); autoSaveTrip(currentTripId, settingsTripName, settingsUnit, settingsAirline, bags, items); }}>Save Changes</button>
               </div>
             </div>
           </div>
