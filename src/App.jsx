@@ -1302,14 +1302,12 @@ export default function PackRite() {
                   )}
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px" }}>Travel dates</label>
-                    <input type="date" value={guideStartDate} onChange={(e) => setGuideStartDate(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px" }} />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px" }}>to</label>
-                    <input type="date" value={guideEndDate} onChange={(e) => setGuideEndDate(e.target.value)} style={{ width: "100%", borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px" }} />
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: "8px" }}>Travel dates</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <input type="date" value={guideStartDate} onChange={(e) => setGuideStartDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px", border: "1.5px solid var(--line)" }} />
+                    <span style={{ color: "var(--ink-soft)", fontWeight: "600" }}>to</span>
+                    <input type="date" value={guideEndDate} onChange={(e) => setGuideEndDate(e.target.value)} style={{ flex: 1, borderRadius: "6px", padding: "10px", fontSize: "14px", minHeight: "38px", border: "1.5px solid var(--line)" }} />
                   </div>
                 </div>
               </div>
